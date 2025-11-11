@@ -41,19 +41,19 @@ class HoppingAutomation:
         cfg = merge_config(base_config, config) if config else base_config
 
         # Paths
-        self.templates_path = cfg.get('templates_path')
-        self.snapshot_dir = cfg.get('snapshot_dir')
-        self.results_dir = cfg.get('results_dir')
+        self.templates_path = cfg['templates_path']
+        self.snapshot_dir = cfg['snapshot_dir']
+        self.results_dir = cfg['results_dir']
         
         # Timing
-        self.wait_after_touch = cfg.get('wait_after_touch')
-        self.loading_wait = cfg.get('loading_wait')
-        self.cooldown_wait = cfg.get('cooldown_wait', 3.0)
+        self.wait_after_touch = cfg['wait_after_touch']
+        self.loading_wait = cfg['loading_wait']
+        self.cooldown_wait = cfg['cooldown_wait']
         
         # Hop settings
-        self.max_hops = cfg.get('max_hops', 10)
-        self.retry_on_fail = cfg.get('retry_on_fail', True)
-        self.max_retries = cfg.get('max_retries', 3)
+        self.max_hops = cfg['max_hops']
+        self.retry_on_fail = cfg['retry_on_fail']
+        self.max_retries = cfg['max_retries']
 
         # Ensure directories exist
         ensure_directory(self.snapshot_dir)

@@ -52,7 +52,7 @@ class UIUtils:
 
     @staticmethod
     def save_file(parent: tk.Widget, title: str, defaultextension: str = "",
-                  filetypes: list = None) -> Optional[str]:
+                  filetypes: Optional[list] = None) -> Optional[str]:
         """Common save file dialog with error handling."""
         if filetypes is None:
             filetypes = [("All files", "*.*")]
@@ -73,7 +73,7 @@ class UIUtils:
         return None
 
     @staticmethod
-    def validate_numeric_input(value: str, min_val: float = None, max_val: float = None,
+    def validate_numeric_input(value: str, min_val: Optional[float] = None, max_val: Optional[float] = None,
                              default: float = 0.0) -> float:
         """Validate numeric input with bounds checking."""
         try:
@@ -90,7 +90,7 @@ class UIUtils:
             return default
 
     @staticmethod
-    def validate_integer_input(value: str, min_val: int = None, max_val: int = None,
+    def validate_integer_input(value: str, min_val: Optional[int] = None, max_val: Optional[int] = None,
                              default: int = 0) -> int:
         """Validate integer input with bounds checking."""
         try:
@@ -162,7 +162,7 @@ class UIUtils:
 
     @staticmethod
     def open_directory_explorer(directory: str) -> bool:
-        """Open directory in system file explorer."""
+        """Open directory in Windows Explorer."""
         if not UIUtils.ensure_directory_exists(directory):
             return False
 

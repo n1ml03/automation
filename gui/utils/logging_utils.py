@@ -24,13 +24,13 @@ class OptimizedQueueHandler(logging.Handler):
         self.buffer_size = buffer_size
         self.flush_interval = flush_interval
         self.last_flush = time.time()
-        self.lock = threading.Lock()
+        self.buffer_lock = threading.Lock()
 
     def emit(self, record):
         """Buffer log records and flush in batches."""
         log_entry = self.format(record)
 
-        with self.lock:
+        with self.buffer_lock:
             self.buffer.append(log_entry)
 
             # Flush if buffer is full or enough time has passed
@@ -59,7 +59,7 @@ class OptimizedQueueHandler(logging.Handler):
 
     def flush(self):
         """Force flush remaining buffer."""
-        with self.lock:
+        with self.buffer_lock:
             self._flush_buffer()
 
 

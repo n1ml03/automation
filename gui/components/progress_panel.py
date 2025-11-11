@@ -86,7 +86,10 @@ class ProgressPanel(ttk.Frame):
             self.ok_count += 1
         else:
             self.ng_count += 1
-        if (self.ok_count + self.ng_count) % 5 == 0:
+        
+        processed = self.ok_count + self.ng_count
+        # Update every 5 items, or if this is the last item
+        if processed % 5 == 0 or processed >= self.total:
             self.update_display()
 
     def update_display(self):

@@ -92,7 +92,7 @@ class HoppingTab(BaseAutomationTab):
                 self.loading_wait_var.set(str(config['loading_wait']))
 
     def start_automation(self):
-        """Override to add Hopping-specific UI updates."""
+        """Override to add Hopping-specific validation and progress initialization."""
         # Check device
         if not self.agent.is_device_connected():
             messagebox.showerror("Error", "Device not connected!\nPlease connect device first.")
@@ -101,20 +101,16 @@ class HoppingTab(BaseAutomationTab):
         # Get config and initialize progress
         config = self.get_config()
         self.progress_panel.start(config['num_hops'])
-
         self.results_var.set("Running...")
-        self.is_running = True
-        self.start_button.config(state='disabled')
-        self.stop_button.config(state='normal')
-        self.status_var.set(f"🔄 Running {self.tab_name.lower()} automation...")
 
-        file_path = ""  # Hopping doesn't need file input
+        # Set running state and start thread
+        self._set_running_state(True)
         self.thread_cancel_event.clear()
+        
+        file_path = ""  # Hopping doesn't need file input
         thread = self.thread_manager.submit_task(self.task_id, self._run_automation, file_path, config)
         
-        if thread:
-            logger.info(f"{self.tab_name} automation started")
-        else:
+        if not thread:
             self._automation_finished(False, "Failed to start thread")
 
     def _run_automation(self, file_path: str, config: Dict[str, Any]):
@@ -127,6 +123,11 @@ class HoppingTab(BaseAutomationTab):
             
             # Initialize HoppingAutomation
             self.automation_instance = self.automation_class(self.agent, config)
+            
+            # Verify instance was created
+            if self.automation_instance is None:
+                logger.error("Failed to create Hopping automation instance")
+                return False
 
             # Run hopping (Hopping doesn't need file input)
             success = self.automation_instance.run(config)

@@ -50,12 +50,12 @@ class FestivalAutomation:
         cfg = merge_config(base_config, config) if config else base_config
 
         # Paths
-        self.templates_path = cfg.get('templates_path')
-        self.snapshot_dir = cfg.get('snapshot_dir')
-        self.results_dir = cfg.get('results_dir')
+        self.templates_path = cfg['templates_path']
+        self.snapshot_dir = cfg['snapshot_dir']
+        self.results_dir = cfg['results_dir']
         
         # Timing
-        self.wait_after_touch = cfg.get('wait_after_touch')
+        self.wait_after_touch = cfg['wait_after_touch']
 
         # Ensure directories exist
         ensure_directory(self.snapshot_dir)
@@ -522,7 +522,7 @@ class FestivalAutomation:
 
         matches = 0
         mismatches = []
-        detailed_results = {} if return_details else None
+        detailed_results: Dict[str, Any] = {}
 
         for field, expected_value in comparable_fields.items():
             if field not in extracted_data:
@@ -592,7 +592,7 @@ class FestivalAutomation:
         else:
             message = f"✗ {matches}/{total} matched ({', '.join(mismatches[:3])})"
 
-        return is_ok, message, detailed_results
+        return is_ok, message, detailed_results if return_details else None
 
     def run_festival_stage(self, stage_data: Dict[str, Any], stage_idx: int,
                           use_detector: bool = False) -> bool:

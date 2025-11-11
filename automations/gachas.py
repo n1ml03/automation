@@ -41,17 +41,17 @@ class GachaAutomation:
         cfg = merge_config(base_config, config) if config else base_config
 
         # Paths
-        self.templates_path = cfg.get('templates_path')
-        self.snapshot_dir = cfg.get('snapshot_dir')
-        self.results_dir = cfg.get('results_dir')
+        self.templates_path = cfg['templates_path']
+        self.snapshot_dir = cfg['snapshot_dir']
+        self.results_dir = cfg['results_dir']
         
         # Timing
-        self.wait_after_touch = cfg.get('wait_after_touch')
-        self.wait_after_pull = cfg.get('wait_after_pull', 2.0)
+        self.wait_after_touch = cfg['wait_after_touch']
+        self.wait_after_pull = cfg['wait_after_pull']
         
         # Pull settings
-        self.max_pulls = cfg.get('max_pulls', 10)
-        self.pull_type = cfg.get('pull_type', 'single')
+        self.max_pulls = cfg['max_pulls']
+        self.pull_type = cfg['pull_type']
 
         # Ensure directories exist
         ensure_directory(self.snapshot_dir)

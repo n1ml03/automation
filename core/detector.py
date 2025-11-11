@@ -12,13 +12,13 @@ logger = get_logger(__name__)
 
 # Conditional YOLO import
 try:
-    from ultralytics import YOLO
+    from ultralytics import YOLO  # type: ignore
     import torch
     YOLO_AVAILABLE = True
     logger.info("YOLO available")
 except ImportError:
     YOLO_AVAILABLE = False
-    YOLO = None
+    YOLO = None  # type: ignore
     torch = None
     logger.warning("YOLO not available. Install: pip install ultralytics torch")
 
@@ -46,8 +46,16 @@ class YOLODetector:
     def _init_model(self) -> None:
         """Load YOLO model and configure device."""
         try:
+            # Check YOLO is available (should be caught in __init__, but double check)
+            if YOLO is None:
+                raise RuntimeError("YOLO not available")
+            
             logger.info(f"Loading YOLO model from {self.model_path}...")
             self.model = YOLO(self.model_path)
+            
+            # Verify model was loaded
+            if self.model is None:
+                raise RuntimeError("Failed to load YOLO model")
 
             if self.device == 'auto' and torch is not None:
                 if torch.cuda.is_available():

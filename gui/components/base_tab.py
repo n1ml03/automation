@@ -364,7 +364,15 @@ class BaseAutomationTab(ttk.Frame):
                 logger.info(f"{self.tab_name} automation cancelled before start")
                 return False
             
+            # Initialize automation instance
             self.automation_instance = self.automation_class(self.agent, config)
+            
+            # Verify instance was created
+            if self.automation_instance is None:
+                logger.error(f"Failed to create {self.tab_name} automation instance")
+                return False
+            
+            # Run automation
             success = self.automation_instance.run(file_path)
             
             if not self.thread_cancel_event.is_set():

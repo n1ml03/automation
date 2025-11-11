@@ -99,6 +99,11 @@ class FestivalTab(BaseAutomationTab):
             
             # Initialize FestivalAutomation
             self.automation_instance = self.automation_class(self.agent, config)
+            
+            # Verify instance was created
+            if self.automation_instance is None:
+                logger.error("Failed to create Festival automation instance")
+                return False
 
             # Get output path if specified
             output_file = self.output_file_var.get().strip()

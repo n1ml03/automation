@@ -4,10 +4,7 @@ Thread Management Utilities for GUI Operations
 
 import threading
 import time
-import weakref
-from typing import Callable, Any, Optional, Dict
-from concurrent.futures import ThreadPoolExecutor, Future
-import queue
+from typing import Callable, Any, Optional, Dict, Tuple
 from core.utils import get_logger
 
 logger = get_logger(__name__)
@@ -16,8 +13,8 @@ logger = get_logger(__name__)
 class CancellableThread:
     """A thread that supports cancellation and proper cleanup."""
 
-    def __init__(self, target: Callable, args: tuple = (), kwargs: dict = None,
-                 name: str = None, daemon: bool = True):
+    def __init__(self, target: Callable, args: tuple = (), kwargs: Optional[Dict] = None,
+                 name: Optional[str] = None, daemon: bool = True):
         self.target = target
         self.args = args
         self.kwargs = kwargs or {}
@@ -100,14 +97,14 @@ class CancellableThread:
 
     def is_alive(self) -> bool:
         """Check if thread is still running."""
-        return self.thread and self.thread.is_alive()
+        return bool(self.thread and self.thread.is_alive())
 
 
 class ThreadManager:
     """Manager for background threads with automatic cleanup."""
 
     def __init__(self, max_workers: int = 4):
-        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="GUIBackground")
+        self.max_workers = max_workers
         self.active_threads: Dict[str, CancellableThread] = {}
         self.lock = threading.RLock()
         self._shutdown = False
@@ -156,7 +153,7 @@ class ThreadManager:
 
             return thread.wait(timeout)
 
-    def get_task_result(self, task_id: str) -> tuple:
+    def get_task_result(self, task_id: str) -> Tuple[Any, Optional[Exception]]:
         """Get task result and exception. Returns (result, exception)."""
         with self.lock:
             thread = self.active_threads.get(task_id)
@@ -169,7 +166,7 @@ class ThreadManager:
         """Check if a task is currently running."""
         with self.lock:
             thread = self.active_threads.get(task_id)
-            return thread and thread.is_running
+            return bool(thread and thread.is_running)
 
     def cancel_all(self, timeout: float = 5.0):
         """Cancel all active tasks."""
@@ -203,12 +200,6 @@ class ThreadManager:
         # Cancel all active tasks
         self.cancel_all(timeout)
 
-        # Shutdown executor
-        try:
-            self.executor.shutdown(wait=True)
-        except Exception as e:
-            logger.error(f"Error shutting down executor: {e}")
-
         logger.info("ThreadManager shutdown complete")
 
 
@@ -219,8 +210,10 @@ class BackgroundTaskRunner:
         self.thread_manager = thread_manager
         self.ui_callbacks: Dict[str, Callable] = {}
 
-    def run_task(self, task_id: str, task_func: Callable, on_complete: Callable = None,
-                on_error: Callable = None, *args, **kwargs):
+    def run_task(self, task_id: str, task_func: Callable, 
+                 on_complete: Optional[Callable] = None,
+                 on_error: Optional[Callable] = None,
+                 *args, **kwargs):
         """Run a background task with completion callbacks."""
 
         def wrapped_task():

@@ -125,6 +125,10 @@ class Agent:
             self.logger.error("Device not connected")
             return None
             
+        if self.device is None:
+            self.logger.error("Device is None")
+            return None
+            
         try:
             return self.device.snapshot()
         except Exception as e:
@@ -169,8 +173,12 @@ class Agent:
             self.logger.error("Device not connected")
             return False
 
+        # Convert list to tuple if needed
         if isinstance(pos, list):
-            pos = tuple[float, ...](pos)
+            if len(pos) != 2:
+                self.logger.error(f"Invalid coordinates: {pos}")
+                return False
+            pos = (float(pos[0]), float(pos[1]))
 
         if not (isinstance(pos, tuple) and len(pos) == 2):
             self.logger.error(f"Invalid coordinates: {pos}")
