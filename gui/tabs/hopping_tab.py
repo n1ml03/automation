@@ -80,59 +80,16 @@ class HoppingTab(BaseAutomationTab):
         )
         results_label.pack(fill='x')
 
-    def save_config(self):
-        """Override to include Hopping-specific config."""
-        filename = filedialog.asksaveasfilename(
-            title="Save hopping config",
-            defaultextension=".json",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
-        if not filename:
-            return
-
-        config = self.get_config()
-
-        try:
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=2, ensure_ascii=False)
-            messagebox.showinfo("Success", f"Config saved to:\n{filename}")
-            logger.info(f"Config saved: {filename}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Cannot save config:\n{str(e)}")
+    # Use parent's save_config - no need to override
 
     def load_config(self):
-        """Override to load Hopping-specific config."""
-        filename = filedialog.askopenfilename(
-            title="Load hopping config",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-        )
-        if not filename:
-            return
-
-        try:
-            with open(filename, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-
-            # Apply config to UI
+        """Load Hopping configuration."""
+        config = super().load_config()
+        if config:
             if 'num_hops' in config:
                 self.num_hops_var.set(str(config['num_hops']))
             if 'loading_wait' in config:
                 self.loading_wait_var.set(str(config['loading_wait']))
-
-            # Apply common config
-            if 'templates_path' in config:
-                self.templates_path_var.set(config['templates_path'])
-            if 'snapshot_dir' in config:
-                self.snapshot_dir_var.set(config['snapshot_dir'])
-            if 'results_dir' in config:
-                self.results_dir_var.set(config['results_dir'])
-            if 'wait_after_touch' in config:
-                self.wait_time_var.set(str(config['wait_after_touch']))
-
-            messagebox.showinfo("Success", "Config loaded successfully!")
-            logger.info(f"Config loaded: {filename}")
-        except Exception as e:
-            messagebox.showerror("Error", f"Cannot load config:\n{str(e)}")
 
     def start_automation(self):
         """Override to add Hopping-specific UI updates."""
@@ -145,29 +102,46 @@ class HoppingTab(BaseAutomationTab):
         config = self.get_config()
         self.progress_panel.start(config['num_hops'])
 
-        # Update UI
         self.results_var.set("Running...")
+        self.is_running = True
+        self.start_button.config(state='disabled')
+        self.stop_button.config(state='normal')
+        self.status_var.set(f"🔄 Running {self.tab_name.lower()} automation...")
 
-        # Call parent implementation
-        super().start_automation()
+        file_path = ""  # Hopping doesn't need file input
+        self.thread_cancel_event.clear()
+        thread = self.thread_manager.submit_task(self.task_id, self._run_automation, file_path, config)
+        
+        if thread:
+            logger.info(f"{self.tab_name} automation started")
+        else:
+            self._automation_finished(False, "Failed to start thread")
 
     def _run_automation(self, file_path: str, config: Dict[str, Any]):
         """Override to handle Hopping-specific automation logic."""
         try:
+            # Check for cancellation before starting
+            if self.thread_cancel_event.is_set():
+                logger.info("Hopping automation cancelled before start")
+                return False
+            
             # Initialize HoppingAutomation
             self.automation_instance = self.automation_class(self.agent, config)
 
             # Run hopping (Hopping doesn't need file input)
             success = self.automation_instance.run(config)
-
-            # Update UI
+            
+            # Call completion callback if not cancelled
             if not self.thread_cancel_event.is_set():
                 self.after(0, lambda: self._automation_finished(success))
+            
+            return success
 
         except Exception as e:
             logger.error(f"Hopping automation error: {e}")
             if not self.thread_cancel_event.is_set():
                 self.after(0, lambda: self._automation_finished(False, str(e)))
+            raise  # Re-raise for thread manager tracking
 
     def _automation_finished(self, success: bool, error_msg: str = ""):
         """Override to add Hopping-specific result updates."""

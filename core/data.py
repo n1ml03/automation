@@ -84,6 +84,34 @@ def load_json(file_path: str, encoding: str = 'utf-8') -> List[Dict[str, Any]]:
         return []
 
 
+def load_data(file_path: str, encoding: str = 'utf-8') -> List[Dict[str, Any]]:
+    """
+    Auto-detect and load data from CSV or JSON file.
+    
+    Args:
+        file_path (str): File path (CSV or JSON)
+        encoding (str): File encoding (default: utf-8)
+    
+    Returns:
+        List[Dict[str, Any]]: List of dictionaries
+    
+    Raises:
+        FileNotFoundError: If file does not exist
+        ValueError: If file format is not supported
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    ext = os.path.splitext(file_path)[1].lower()
+    
+    if ext == '.csv':
+        return load_csv(file_path, encoding)
+    elif ext == '.json':
+        return load_json(file_path, encoding)
+    else:
+        raise ValueError(f"Unsupported file format: {ext}. Use .csv or .json")
+
+
 # ==================== DATA WRITING ====================
 
 def write_csv(file_path: str, data: List[Dict[str, Any]],

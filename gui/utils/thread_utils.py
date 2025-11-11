@@ -204,7 +204,10 @@ class ThreadManager:
         self.cancel_all(timeout)
 
         # Shutdown executor
-        self.executor.shutdown(wait=True, timeout=timeout)
+        try:
+            self.executor.shutdown(wait=True)
+        except Exception as e:
+            logger.error(f"Error shutting down executor: {e}")
 
         logger.info("ThreadManager shutdown complete")
 

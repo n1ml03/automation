@@ -70,15 +70,10 @@ class OptimizedLogViewer:
         self.parent = parent
         self.log_queue = log_queue
         self.max_lines = max_lines
-        self.poll_interval = poll_interval  # milliseconds
+        self.poll_interval = poll_interval
         self.auto_scroll = True
         self.is_polling = False
         self.poll_job_id: Optional[str] = None
-
-        # Performance tracking
-        self.last_poll_time = 0
-        self.poll_count = 0
-        self.adaptive_mode = True
 
         self._setup_ui()
 
@@ -102,9 +97,6 @@ class OptimizedLogViewer:
             variable=self.auto_scroll_var
         ).pack(side='right', padx=5)
 
-        # Performance indicator
-        self.perf_label = ttk.Label(log_header, text="", font=('', 8), foreground='gray')
-        self.perf_label.pack(side='right', padx=10)
 
         # Control buttons
         ttk.Button(
@@ -155,83 +147,38 @@ class OptimizedLogViewer:
             self.poll_job_id = None
 
     def _poll_logs(self):
-        """Optimized log polling with adaptive frequency."""
+        """Poll and display log entries."""
         if not self.is_polling:
             return
 
-        start_time = time.time()
-        updated = False
         batch_entries = []
-
-        # Process all available log entries
-        while True:
+        while len(batch_entries) < 50:
             try:
                 entry = self.log_queue.get_nowait()
                 batch_entries.append(entry)
             except queue.Empty:
                 break
 
-        # Insert batch entries efficiently
         if batch_entries:
             self.log_text.insert('end', '\n'.join(batch_entries) + '\n')
-            updated = True
-
-            # Limit log lines for performance
             self._limit_log_lines()
+            
+            if self.auto_scroll:
+                self.log_text.see('end')
 
-        # Adaptive polling frequency
-        if self.adaptive_mode:
-            poll_time = time.time() - start_time
-            self.poll_count += 1
-
-            # Adjust polling frequency based on activity
-            if batch_entries:
-                # High activity - poll more frequently
-                next_interval = max(50, self.poll_interval // 2)
-            else:
-                # Low activity - poll less frequently
-                next_interval = min(1000, self.poll_interval * 2)
-
-            self.poll_interval = next_interval
-
-            # Update performance indicator occasionally
-            if self.poll_count % 10 == 0:
-                self._update_performance_indicator(poll_time)
-
-        # Auto scroll if enabled and we had updates
-        if updated and self.auto_scroll:
-            self.log_text.see('end')
-
-        # Schedule next poll
         if self.is_polling:
             self.poll_job_id = self.parent.after(self.poll_interval, self._poll_logs)
 
     def _limit_log_lines(self):
-        """Limit the number of log lines for performance."""
-        try:
-            # Get total lines
-            content = self.log_text.get('1.0', 'end-1c')
-            lines = content.split('\n')
+        """Keep log within maximum line limit."""
+        content = self.log_text.get('1.0', 'end-1c')
+        lines = content.split('\n')
 
-            if len(lines) > self.max_lines:
-                # Keep only the most recent lines
-                keep_lines = lines[-(self.max_lines // 2):]
-                self.log_text.delete('1.0', 'end')
-                self.log_text.insert('1.0', '\n'.join(keep_lines) + '\n')
-                logger.info(f"Trimmed logs to {len(keep_lines)} lines for performance")
-        except Exception as e:
-            logger.warning(f"Error limiting log lines: {e}")
+        if len(lines) > self.max_lines:
+            keep_lines = lines[-int(self.max_lines * 0.5):]
+            self.log_text.delete('1.0', 'end')
+            self.log_text.insert('1.0', '\n'.join(keep_lines) + '\n')
 
-    def _update_performance_indicator(self, poll_time: float):
-        """Update performance indicator."""
-        try:
-            # Calculate polling frequency
-            freq = 1000 / self.poll_interval  # polls per second
-            self.perf_label.config(
-                text=".1f"
-            )
-        except Exception as e:
-            logger.warning(f"Error updating performance indicator: {e}")
 
     def clear_logs(self):
         """Clear all logs."""

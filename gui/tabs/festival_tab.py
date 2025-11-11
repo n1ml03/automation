@@ -92,6 +92,11 @@ class FestivalTab(BaseAutomationTab):
     def _run_automation(self, file_path: str, config: Dict[str, Any]):
         """Override to handle Festival-specific automation logic."""
         try:
+            # Check for cancellation before starting
+            if self.thread_cancel_event.is_set():
+                logger.info("Festival automation cancelled before start")
+                return False
+            
             # Initialize FestivalAutomation
             self.automation_instance = self.automation_class(self.agent, config)
 
@@ -104,12 +109,15 @@ class FestivalTab(BaseAutomationTab):
                 success = self.automation_instance.run_all_stages(file_path, output_path)
             else:
                 success = self.automation_instance.run(file_path)
-
-            # Update UI
+            
+            # Call completion callback if not cancelled
             if not self.thread_cancel_event.is_set():
                 self.after(0, lambda: self._automation_finished(success))
+            
+            return success
 
         except Exception as e:
             logger.error(f"Festival automation error: {e}")
             if not self.thread_cancel_event.is_set():
                 self.after(0, lambda: self._automation_finished(False, str(e)))
+            raise  # Re-raise for thread manager tracking

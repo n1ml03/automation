@@ -71,6 +71,6 @@ class QuickActionsPanel(ttk.Frame):
         btn_frame.columnconfigure(1, weight=1)
 
     def _call(self, action: str):
-        """Call callback nếu có."""
+        """Execute callback action if available."""
         if action in self.callbacks:
             self.callbacks[action]()

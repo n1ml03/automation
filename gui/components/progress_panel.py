@@ -65,7 +65,7 @@ class ProgressPanel(ttk.Frame):
         self.reset()
 
     def reset(self):
-        """Reset tất cả counters."""
+        """Reset all counters."""
         self.total = 0
         self.ok_count = 0
         self.ng_count = 0
@@ -73,7 +73,7 @@ class ProgressPanel(ttk.Frame):
         self.update_display()
 
     def start(self, total: int):
-        """Bắt đầu tracking."""
+        """Start progress tracking."""
         self.total = total
         self.ok_count = 0
         self.ng_count = 0
@@ -81,44 +81,42 @@ class ProgressPanel(ttk.Frame):
         self.update_display()
 
     def update_result(self, ok: bool):
-        """Update khi có kết quả mới."""
+        """Update progress with new result."""
         if ok:
             self.ok_count += 1
         else:
             self.ng_count += 1
-        self.update_display()
+        if (self.ok_count + self.ng_count) % 5 == 0:
+            self.update_display()
 
     def update_display(self):
-        """Cập nhật hiển thị."""
-        # Update labels
+        """Update progress display."""
         self.total_label.config(text=str(self.total))
         self.ok_label.config(text=str(self.ok_count))
         self.ng_label.config(text=str(self.ng_count))
 
-        # Update progress
         if self.total > 0:
             processed = self.ok_count + self.ng_count
             progress = (processed / self.total) * 100
             self.progress_var.set(progress)
-            self.progress_label.config(text=f"{processed}/{self.total} ({progress:.1f}%)")
+            self.progress_label.config(text=f"{processed}/{self.total}")
         else:
             self.progress_var.set(0)
             self.progress_label.config(text="Ready")
 
-        # Update time
         if self.start_time:
             elapsed = time.time() - self.start_time
             self.time_label.config(text=self._format_time(elapsed))
 
-            # Calculate ETA
             processed = self.ok_count + self.ng_count
-            if processed > 0:
-                avg_time = elapsed / processed
-                remaining = (self.total - processed) * avg_time
+            if 0 < processed < self.total:
+                remaining = elapsed / processed * (self.total - processed)
                 self.eta_label.config(text=self._format_time(remaining))
+            elif processed >= self.total:
+                self.eta_label.config(text="Done")
 
     def _format_time(self, seconds: float) -> str:
-        """Format time thành HH:MM:SS."""
+        """Format seconds to HH:MM:SS."""
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         secs = int(seconds % 60)

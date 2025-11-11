@@ -1,7 +1,4 @@
-"""
-Item Detector Module - YOLO Detection and Template Matching
-Stored for future use when automatic item detection is needed.
-"""
+"""Item Detector Module - YOLO and Template Matching for automated detection."""
 
 import cv2
 import numpy as np
@@ -29,22 +26,11 @@ except ImportError:
 # ==================== YOLO DETECTOR ====================
 
 class YOLODetector:
-    """
-    YOLO-based item detector.
-    Detects items in game using YOLO model.
-    """
+    """YOLO-based item detector for game objects."""
 
     def __init__(self, agent: Agent, model_path: str = "yolo11n.pt",
                  confidence: float = 0.25, device: str = "cpu"):
-        """
-        Initialize YOLO Detector.
-
-        Args:
-            agent (Agent): Agent instance for OCR usage
-            model_path (str): Path to YOLO model
-            confidence (float): Confidence threshold (0.0-1.0)
-            device (str): Model running device ('cpu', 'cuda', 'mps', 'auto')
-        """
+        """Initialize YOLO detector with model and configuration."""
         self.agent = agent
         self.model_path = model_path
         self.confidence = confidence
@@ -58,12 +44,11 @@ class YOLODetector:
         self._init_model()
 
     def _init_model(self) -> None:
-        """Initialize YOLO model."""
+        """Load YOLO model and configure device."""
         try:
-            logger.info(f" Loading YOLO model from {self.model_path}...")
+            logger.info(f"Loading YOLO model from {self.model_path}...")
             self.model = YOLO(self.model_path)
 
-            # Auto-detect device
             if self.device == 'auto' and torch is not None:
                 if torch.cuda.is_available():
                     self.device = 'cuda'
@@ -72,32 +57,15 @@ class YOLODetector:
                 else:
                     self.device = 'cpu'
 
-            logger.info(f" YOLO model loaded on device: {self.device}")
+            logger.info(f"YOLO model loaded on device: {self.device}")
 
         except Exception as e:
-            logger.error(f" YOLO initialization failed: {e}")
+            logger.error(f"YOLO initialization failed: {e}")
             raise
 
     def detect(self, image: np.ndarray, conf: Optional[float] = None,
                iou: float = 0.45, imgsz: int = 640) -> List[Dict[str, Any]]:
-        """
-        Detect items in image.
-
-        Args:
-            image (np.ndarray): BGR image
-            conf (Optional[float]): Confidence threshold (None = use default)
-            iou (float): IoU threshold for NMS
-            imgsz (int): Input image size
-
-        Returns:
-            List[Dict[str, Any]]: List of detected items
-                - item (str): Item name
-                - quantity (int): Quantity (from OCR)
-                - x, y, x2, y2 (int): Bounding box
-                - center_x, center_y (int): Center coordinates
-                - confidence (float): Confidence score
-                - ocr_text (str): Raw OCR text
-        """
+        """Detect items in image with YOLO and extract quantities via OCR."""
         if self.model is None:
             logger.error(" YOLO model not initialized")
             return []
@@ -159,40 +127,23 @@ class YOLODetector:
                          bbox: Tuple[int, int, int, int],
                          offset_x: int = 30, offset_y: int = 0,
                          roi_width: int = 80, roi_height: int = 30) -> Tuple[int, str]:
-        """
-        Extract quantity from area near bbox using OCR.
-
-        Args:
-            image (np.ndarray): BGR image
-            bbox (Tuple[int, int, int, int]): Bounding box (x1, y1, x2, y2)
-            offset_x (int): Offset X from right corner of bbox
-            offset_y (int): Offset Y from bottom corner of bbox
-            roi_width (int): OCR region width
-            roi_height (int): OCR region height
-
-        Returns:
-            Tuple[int, str]: (quantity, ocr_text)
-        """
+        """Extract item quantity from region near bounding box using OCR."""
         x1, y1, x2, y2 = bbox
         img_h, img_w = image.shape[:2]
 
-        # Calculate quantity ROI (typically bottom-right of item)
         quantity_x1 = max(0, x2 + offset_x)
         quantity_y1 = max(0, y2 + offset_y)
         quantity_x2 = min(img_w, quantity_x1 + roi_width)
         quantity_y2 = min(img_h, quantity_y1 + roi_height)
 
-        # Validate ROI
         if quantity_x1 >= quantity_x2 or quantity_y1 >= quantity_y2:
             return 0, ''
 
-        # Extract ROI
         quantity_roi = image[quantity_y1:quantity_y2, quantity_x1:quantity_x2]
         if quantity_roi.size == 0:
             return 0, ''
 
         try:
-            # OCR quantity region
             if self.agent.ocr_engine is None:
                 return 0, ''
 
@@ -203,30 +154,20 @@ class YOLODetector:
             return quantity, ocr_text
 
         except Exception as e:
-            logger.debug(f" Quantity OCR error: {e}")
+            logger.debug(f"Quantity OCR error: {e}")
             return 0, ''
 
     @staticmethod
     def _parse_quantity(text: str) -> int:
-        """
-        Parse số lượng từ text OCR.
-
-        Args:
-            text (str): Text chứa số lượng
-
-        Returns:
-            int: Số lượng (0 nếu không tìm thấy)
-        """
+        """Parse quantity number from OCR text."""
         if not text:
             return 0
 
-        # Format text
         text = text.strip()
         if text.startswith('x') or text.startswith('X'):
             text = text[1:].strip()
         text = text.replace(',', '').replace(' ', '')
 
-        # Find all numbers
         numbers = re.findall(r'\d+', text)
         if not numbers:
             return 0
@@ -240,32 +181,22 @@ class YOLODetector:
 # ==================== TEMPLATE MATCHER ====================
 
 class TemplateMatcher:
-    """
-    Template-based item detector.
-    Detects items using template matching (fallback when YOLO unavailable).
-    """
+    """Template-based item detector using OpenCV matching."""
 
     def __init__(self, templates_dir: str = "templates",
                  threshold: float = 0.85, method: str = "TM_CCOEFF_NORMED"):
-        """
-        Initialize Template Matcher.
-
-        Args:
-            templates_dir (str): Directory containing template images
-            threshold (float): Confidence threshold (0.0-1.0)
-            method (str): OpenCV matching method
-        """
+        """Initialize template matcher with directory and matching threshold."""
         self.templates_dir = templates_dir
         self.threshold = threshold
         self.method = method
         self.templates = self._load_templates()
 
-        logger.info(f" TemplateMatcher initialized with {len(self.templates)} templates")
+        logger.info(f"TemplateMatcher initialized with {len(self.templates)} templates")
 
     def _load_templates(self) -> Dict[str, np.ndarray]:
-        """Load all template images."""
+        """Load template images from directory."""
         if not os.path.isdir(self.templates_dir):
-            logger.warning(f" Templates directory not found: {self.templates_dir}")
+            logger.warning(f"Templates directory not found: {self.templates_dir}")
             return {}
 
         templates = {}
@@ -281,37 +212,26 @@ class TemplateMatcher:
                     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
                     if img is not None:
                         templates[name] = img
-                        logger.debug(f"✓ Loaded template: {name}")
+                        logger.debug(f"Loaded template: {name}")
                 except Exception as e:
-                    logger.error(f" Error loading template {filename}: {e}")
+                    logger.error(f"Error loading template {filename}: {e}")
 
         return templates
 
     def detect(self, image: np.ndarray,
                threshold: Optional[float] = None) -> List[Dict[str, Any]]:
-        """
-        Detect items in image using template matching.
-
-        Args:
-            image (np.ndarray): BGR image
-            threshold (Optional[float]): Confidence threshold (None = use default)
-
-        Returns:
-            List[Dict[str, Any]]: List of detected items
-        """
+        """Detect items in image using template matching."""
         if threshold is None:
             threshold = self.threshold
 
-        # Convert to grayscale
         try:
             image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         except Exception as e:
-            logger.error(f" Grayscale conversion error: {e}")
+            logger.error(f"Grayscale conversion error: {e}")
             return []
 
         found_items = []
 
-        # Process each template
         for template_name, template in self.templates.items():
             matches = self._find_matches(image_gray, template, threshold)
 
@@ -330,40 +250,36 @@ class TemplateMatcher:
                     'ocr_text': ''
                 })
 
-        # Remove duplicates
         unique_items = self._remove_duplicates(found_items, min_distance=10)
-
-        logger.info(f" Template matching found {len(unique_items)} items")
+        logger.info(f"Template matching found {len(unique_items)} items")
         return unique_items
 
     def _find_matches(self, image_gray: np.ndarray, template: np.ndarray,
                      threshold: float) -> List[Tuple[int, int]]:
-        """Find positions that match template."""
+        """Find template match positions in image."""
         try:
             method = getattr(cv2, self.method)
             res = cv2.matchTemplate(image_gray, template, method)
 
-            # Normalize if needed
             if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
                 res = 1 - res
 
             locs = np.where(res >= threshold)
-            matches = list(zip(*locs[::-1]))  # (x, y) tuples
+            matches = list(zip(*locs[::-1]))
 
             return matches
 
         except Exception as e:
-            logger.error(f" Template matching error: {e}")
+            logger.error(f"Template matching error: {e}")
             return []
 
     @staticmethod
     def _remove_duplicates(items: List[Dict[str, Any]],
                           min_distance: int) -> List[Dict[str, Any]]:
-        """Loại bỏ các phát hiện trùng lặp."""
+        """Remove duplicate detections within minimum distance."""
         if not items:
             return []
 
-        # Sort by item name and position
         sorted_items = sorted(items, key=lambda i: (i['item'], i['x'], i['y']))
         unique_items = []
 

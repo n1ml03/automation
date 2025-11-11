@@ -1,6 +1,5 @@
 """
-Agent Module - Device interaction and OCR
-Optimized with EnhancedOcrEngine for improved recognition performance.
+Agent Module - Device interaction and OCR with enhanced performance.
 """
 import time
 import copy
@@ -15,41 +14,24 @@ from .utils import get_logger
 # ==================== OCR ENGINE ENHANCEMENT ====================
 
 class EnhancedOcrEngine(oneocr.OcrEngine):
-    """
-    Inherits and extends the original OcrEngine to provide more efficient processing methods.
-
-    This class adds a `recognize` method capable of processing NumPy arrays directly,
-    eliminating unnecessary intermediate steps and significantly improving speed.
-    """
+    """Enhanced OCR engine with direct NumPy array processing for better performance."""
+    
     def recognize(self, image_array: np.ndarray) -> dict:
-        """
-        Process image directly from a NumPy array (from Airtest/OpenCV).
-
-        This is the most efficient method, avoiding wasteful encode/decode cycles.
-
-        Args:
-            image_array (np.ndarray): NumPy array of image (BGR or Grayscale format).
-
-        Returns:
-            dict: Structured OCR result.
-        """
-        # Check image size
+        """Process image from NumPy array efficiently without encode/decode overhead."""
         if any(x < 50 or x > 10000 for x in image_array.shape[:2]):
             result = copy.deepcopy(self.empty_result)
             result['error'] = 'Unsupported image size'
             return result
 
-        # Convert color format to BGRA as required by DLL
         channels = image_array.shape[2] if len(image_array.shape) == 3 else 1
 
         if channels == 1:
             img_bgra = cv2.cvtColor(image_array, cv2.COLOR_GRAY2BGRA)
         elif channels == 3:
             img_bgra = cv2.cvtColor(image_array, cv2.COLOR_BGR2BGRA)
-        else: # Default assumes image is already 4-channel BGRA
+        else:
             img_bgra = image_array
 
-        # Call parent's original image processing function with direct data pointer
         return self._process_image(
             cols=img_bgra.shape[1],
             rows=img_bgra.shape[0],
@@ -60,23 +42,15 @@ class EnhancedOcrEngine(oneocr.OcrEngine):
 # ==================== AGENT CLASS ====================
 
 class Agent:
-    """
-    Agent that interacts with device through Airtest and handles optimized OCR.
-    """
-    # ==================== CONSTANTS ====================
+    """Agent for device interaction via Airtest and OCR processing."""
+    
     DEFAULT_MAX_RETRIES = 3
     DEFAULT_RETRY_DELAY = 1.0
     DEFAULT_TOUCH_TIMES = 1
 
-    def __init__(self, device_url: str = "Windows:///?title_re=DOAX VenusVacation.*", enable_retry: bool = True, auto_connect: bool = True):
-        """
-        Initialize Agent.
-
-        Args:
-            device_url (str): Device URL (Windows:///, Android:///, iOS:///)
-            enable_retry (bool): Whether to retry on connection failure
-            auto_connect (bool): Whether to auto-connect device on initialization
-        """
+    def __init__(self, device_url: str = "Windows:///?title_re=DOAX VenusVacation.*", 
+                 enable_retry: bool = True, auto_connect: bool = True):
+        """Initialize Agent with device connection and OCR engine."""
         self.logger = get_logger(__name__)
         self.device = None
         self.ocr_engine = None
@@ -84,7 +58,6 @@ class Agent:
         self.device_url = device_url
 
         try:
-            # Initialize optimized OCR engine
             self.ocr_engine = EnhancedOcrEngine()
             self.logger.info("Enhanced OCR engine initialized")
 
@@ -102,14 +75,10 @@ class Agent:
             self.logger.error(f"Agent initialization failed: {e}")
             raise RuntimeError(f"Agent initialization failed: {e}") from e
 
-    # ==================== DEVICE CONNECTION ====================
-
     def connect_device_with_retry(self, device_url: str = "Windows:///?title_re=DOAX",
                                   max_retries: int = DEFAULT_MAX_RETRIES,
                                   retry_delay: float = DEFAULT_RETRY_DELAY) -> bool:
-        """
-        Connect to device with retry mechanism.
-        """
+        """Connect to device with automatic retry on failure."""
         for attempt in range(max_retries):
             try:
                 self.logger.info(f"Connecting to device (attempt {attempt + 1}/{max_retries})...")
@@ -134,7 +103,7 @@ class Agent:
         return False
 
     def _verify_device(self) -> bool:
-        """Internal check to see if device is working."""
+        """Verify device is working properly."""
         try:
             if self.device and hasattr(self.device, 'snapshot'):
                 self._device_verified = True
@@ -144,16 +113,14 @@ class Agent:
             return False
 
     def is_device_connected(self) -> bool:
-        """Check if device is connected and working properly."""
+        """Check if device is connected and functional."""
         if not self.device:
             self._device_verified = False
             return False
         return self._device_verified or self._verify_device()
 
-    # ==================== SCREENSHOT & OCR ====================
-
     def snapshot(self) -> Optional[np.ndarray]:
-        """Take full screenshot of current screen."""
+        """Capture full screen screenshot."""
         if not self.is_device_connected():
             self.logger.error("Device not connected")
             return None
@@ -162,11 +129,11 @@ class Agent:
             return self.device.snapshot()
         except Exception as e:
             self.logger.error(f"Snapshot failed: {e}")
-            self._device_verified = False  # Reset cache on error
+            self._device_verified = False
             return None
 
     def snapshot_region(self, region: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
-        """Take screenshot of a specific screen region."""
+        """Capture screenshot of specific region (x1, y1, x2, y2)."""
         x1, y1, x2, y2 = region
         if x1 >= x2 or y1 >= y2:
             self.logger.error(f"Invalid region: {region}")
@@ -179,37 +146,25 @@ class Agent:
         return full_screenshot[y1:y2, x1:x2]
 
     def ocr(self, region: Optional[Tuple[int, int, int, int]] = None) -> Optional[dict]:
-        """
-        Take screenshot (or region) and perform OCR using optimized flow.
-
-        Args:
-            region (Optional): Region (x1, y1, x2, y2) for OCR. Default is full screen.
-
-        Returns:
-            Optional[dict]: OCR result or None if failed.
-        """
+        """Perform OCR on full screen or specified region."""
         if not self.ocr_engine:
-            self.logger.error(" OCR engine not initialized")
+            self.logger.error("OCR engine not initialized")
             return None
 
         image_array = self.snapshot_region(region) if region else self.snapshot()
         if image_array is None:
-            self.logger.error(" Failed to get screenshot for OCR")
+            self.logger.error("Failed to get screenshot for OCR")
             return None
 
         try:
             return self.ocr_engine.recognize(image_array)
         except Exception as e:
-            self.logger.error(f" OCR recognition failed: {e}")
+            self.logger.error(f"OCR recognition failed: {e}")
             return None
-
-    # ==================== TOUCH & INPUT ====================
 
     def safe_touch(self, pos: Union[Tuple[float, float], List[float]],
                    times: int = DEFAULT_TOUCH_TIMES) -> bool:
-        """
-        Safe touch at a position with error handling.
-        """
+        """Safely touch screen at position with error handling."""
         if not self.is_device_connected():
             self.logger.error("Device not connected")
             return False
@@ -218,13 +173,13 @@ class Agent:
             pos = tuple[float, ...](pos)
 
         if not (isinstance(pos, tuple) and len(pos) == 2):
-            self.logger.error(f" Invalid coordinates: {pos}")
+            self.logger.error(f"Invalid coordinates: {pos}")
             return False
 
         try:
             touch(pos, times=times)
             return True
         except Exception as e:
-            self.logger.error(f" Touch failed at {pos}: {e}")
-            self._device_verified = False  # Reset cache on error
+            self.logger.error(f"Touch failed at {pos}: {e}")
+            self._device_verified = False
             return False
