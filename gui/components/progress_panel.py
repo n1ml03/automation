@@ -5,7 +5,6 @@ Progress Panel Component
 import tkinter as tk
 from tkinter import ttk
 import time
-from typing import Optional
 
 
 class ProgressPanel(ttk.Frame):

@@ -2,17 +2,10 @@
 Main GUI Application
 """
 
-import sys
-import os
-# Add parent directory to path so we can import core module
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-import threading
+from tkinter import ttk, messagebox
 import logging
 import queue
-from typing import Optional
 
 from core.agent import Agent
 from core.utils import get_logger
@@ -210,13 +203,16 @@ class AutoCPeachGUI(tk.Tk):
             messagebox.showerror("Error", "Agent not initialized!")
             return
 
+        # Store agent reference for use in nested function
+        agent = self.agent
+        
         self.device_status_var.set("Connecting...")
         self.footer_status_var.set("Connecting to device...")
         self.connect_button.config(state='disabled')
 
         def connect_task():
             try:
-                success = self.agent.connect_device_with_retry()
+                success = agent.connect_device_with_retry()
                 self.after(0, lambda: self._connect_finished(success))
                 return success
             except Exception as e:

@@ -3,8 +3,7 @@ Hopping Tab for GUI
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-import json
+from tkinter import ttk, messagebox
 import os
 from typing import Dict, Any
 
@@ -42,7 +41,7 @@ class HoppingTab(BaseAutomationTab):
         ttk.Label(config_inner, text="Number of Hops:", font=('', 10)).grid(row=0, column=0, sticky='w', pady=2)
         ttk.Entry(config_inner, textvariable=self.num_hops_var, width=10, font=('', 10)).grid(row=0, column=1, sticky='w', padx=5, pady=2)
 
-        ttk.Label(config_inner, text="💡 Each hop will take you to a different world",
+        ttk.Label(config_inner, text="💡 Default pick Hopping Routlete (1-6)",
                  font=('', 9), foreground='gray').grid(row=1, column=0, columnspan=2, sticky='w', pady=(5, 0))
 
         # Loading wait time

@@ -1,178 +1,130 @@
-"""
-Utility script to train YOLO model from template images and annotations.
-Supports dataset creation, augmentation, and YOLO model training.
-"""
+"""YOLO model training utility for item detection."""
 
-import os
 import cv2
 import yaml
-import shutil
 import numpy as np
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-import logging
-from utils import get_logger
+from typing import List, Optional
+from core.utils import get_logger
+from ultralytics import YOLO  # type: ignore
 
 logger = get_logger(__name__)
 
-# Import YOLO
-from ultralytics import YOLO
-
 
 class YOLOTrainer:
-    """Class to prepare data and train YOLO model for item detection."""
+    """Prepare data and train YOLO model for item detection."""
 
     def __init__(self, templates_dir: str, output_dir: str = "yolo_dataset"):
-        """
-        Initialize YOLOTrainer.
-
-        Args:
-            templates_dir (str): Directory containing template images
-            output_dir (str): Output directory for YOLO dataset
-        """
         self.templates_dir = Path(templates_dir)
         self.output_dir = Path(output_dir)
         self.classes = []
         
         if not self.templates_dir.exists():
-            raise FileNotFoundError(f"Templates directory does not exist: {templates_dir}")
+            raise FileNotFoundError(f"Templates directory not found: {templates_dir}")
 
-    def create_dataset_structure(self) -> None:
-        """Create directory structure for YOLO dataset."""
-        logger.info("Creating YOLO dataset directory structure...")
-
-        # Create main directories
+    def _create_dirs(self) -> None:
+        """Create dataset directory structure."""
         for split in ['train', 'val', 'test']:
             for subdir in ['images', 'labels']:
-                path = self.output_dir / split / subdir
-                path.mkdir(parents=True, exist_ok=True)
-
-        logger.info(f"Created dataset structure at {self.output_dir}")
+                (self.output_dir / split / subdir).mkdir(parents=True, exist_ok=True)
+        logger.info(f"Dataset structure created at {self.output_dir}")
     
-    def load_class_names(self) -> List[str]:
-        """
-        Load class names list from templates directory.
-
-        Returns:
-            List[str]: List of class names
-        """
-        classes = []
-        for file in sorted(self.templates_dir.glob("*")):
-            if file.suffix.lower() in ['.png', '.jpg', '.jpeg']:
-                class_name = file.stem
-                if class_name not in classes:
-                    classes.append(class_name)
-        
-        self.classes = classes
-        logger.info(f"Found {len(classes)} classes: {classes}")
-        return classes
+    def _load_classes(self) -> List[str]:
+        """Load class names from templates directory."""
+        self.classes = sorted(set(
+            f.stem for f in self.templates_dir.glob("*") 
+            if f.suffix.lower() in ['.png', '.jpg', '.jpeg']
+        ))
+        logger.info(f"Found {len(self.classes)} classes: {self.classes}")
+        return self.classes
     
-    def create_synthetic_data(self,
-                             background_images: List[str],
-                             num_samples: int = 100,
-                             max_items_per_image: int = 5) -> None:
-        """
-        Create synthetic training data by pasting templates onto backgrounds.
-
-        Args:
-            background_images (List[str]): List of background image paths
-            num_samples (int): Number of synthetic images to create
-            max_items_per_image (int): Maximum number of items per image
-        """
-        if not self.classes:
-            self.load_class_names()
-        
-        logger.info(f"Creating {num_samples} synthetic images...")
-        
-        # Load templates
+    def _load_templates(self) -> dict:
+        """Load template images into memory."""
         templates = {}
         for class_name in self.classes:
-            template_files = list(self.templates_dir.glob(f"{class_name}.*"))
-            if template_files:
-                template_img = cv2.imread(str(template_files[0]), cv2.IMREAD_UNCHANGED)
-                templates[class_name] = template_img
+            files = list(self.templates_dir.glob(f"{class_name}.*"))
+            if files:
+                img = cv2.imread(str(files[0]), cv2.IMREAD_UNCHANGED)
+                if img is not None:
+                    templates[class_name] = img
+        return templates
+
+    def _paste_template(self, background: np.ndarray, template: np.ndarray, 
+                       x: int, y: int) -> None:
+        """Paste template onto background with alpha blending if available."""
+        th, tw = template.shape[:2]
+        if template.shape[2] == 4:  # Has alpha channel
+            alpha = template[:, :, 3:4] / 255.0
+            background[y:y+th, x:x+tw] = (
+                alpha * template[:, :, :3] + (1 - alpha) * background[y:y+th, x:x+tw]
+            )
+        else:
+            background[y:y+th, x:x+tw] = template[:, :, :3]
+
+    def create_synthetic_data(self, background_images: List[str], 
+                            num_samples: int = 100, 
+                            max_items_per_image: int = 5) -> None:
+        """Create synthetic training data by pasting templates onto backgrounds."""
+        if not self.classes:
+            self._load_classes()
         
-        # Tạo synthetic data
+        logger.info(f"Creating {num_samples} synthetic images...")
+        templates = self._load_templates()
+        
         for i in range(num_samples):
-            # Chọn random background
             bg_path = np.random.choice(background_images)
             background = cv2.imread(bg_path)
             
             if background is None:
-                logger.warning(f"Không thể đọc background: {bg_path}")
+                logger.warning(f"Cannot read background: {bg_path}")
                 continue
             
             h, w = background.shape[:2]
             annotations = []
-            
-            # Paste random số lượng items
             num_items = np.random.randint(1, max_items_per_image + 1)
             
             for _ in range(num_items):
-                # Chọn random class
                 class_name = np.random.choice(self.classes)
                 class_id = self.classes.index(class_name)
-                template = templates[class_name]
+                template = templates.get(class_name)
                 
                 if template is None:
                     continue
                 
                 th, tw = template.shape[:2]
-                
-                # Random vị trí paste
                 x = np.random.randint(0, max(1, w - tw))
                 y = np.random.randint(0, max(1, h - th))
                 
-                # Paste template lên background
-                if template.shape[2] == 4:  # Có alpha channel
-                    alpha = template[:, :, 3] / 255.0
-                    for c in range(3):
-                        background[y:y+th, x:x+tw, c] = (
-                            alpha * template[:, :, c] + 
-                            (1 - alpha) * background[y:y+th, x:x+tw, c]
-                        )
-                else:
-                    background[y:y+th, x:x+tw] = template
+                self._paste_template(background, template, x, y)
                 
-                # Tạo annotation YOLO format: class_id x_center y_center width height (normalized)
+                # YOLO format: class_id x_center y_center width height (normalized)
                 x_center = (x + tw / 2) / w
                 y_center = (y + th / 2) / h
                 width_norm = tw / w
                 height_norm = th / h
                 
-                annotations.append(f"{class_id} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}")
+                annotations.append(
+                    f"{class_id} {x_center:.6f} {y_center:.6f} {width_norm:.6f} {height_norm:.6f}"
+                )
             
-            # Lưu image và annotation
+            # Save image and annotation
             split = 'train' if i < num_samples * 0.8 else 'val'
-            
             img_path = self.output_dir / split / 'images' / f"synthetic_{i:04d}.jpg"
             label_path = self.output_dir / split / 'labels' / f"synthetic_{i:04d}.txt"
             
             cv2.imwrite(str(img_path), background)
-            
-            with open(label_path, 'w') as f:
-                f.write('\n'.join(annotations))
+            label_path.write_text('\n'.join(annotations))
         
-        logger.info(f"Đã tạo {num_samples} synthetic images")
+        logger.info(f"Created {num_samples} synthetic images")
     
     def create_data_yaml(self, dataset_path: Optional[str] = None) -> str:
-        """
-        Tạo file data.yaml cho YOLO training.
-        
-        Args:
-            dataset_path (Optional[str]): Đường dẫn dataset (default: output_dir)
-        
-        Returns:
-            str: Đường dẫn file data.yaml
-        """
+        """Create data.yaml config file for YOLO training."""
         if not self.classes:
-            self.load_class_names()
-        
-        if dataset_path is None:
-            dataset_path = str(self.output_dir.absolute())
+            self._load_classes()
         
         data_yaml = {
-            'path': dataset_path,
+            'path': dataset_path or str(self.output_dir.absolute()),
             'train': 'train/images',
             'val': 'val/images',
             'test': 'test/images',
@@ -181,43 +133,25 @@ class YOLOTrainer:
         }
         
         yaml_path = self.output_dir / 'data.yaml'
-        
         with open(yaml_path, 'w') as f:
             yaml.dump(data_yaml, f, default_flow_style=False)
         
-        logger.info(f"Đã tạo data.yaml tại {yaml_path}")
+        logger.info(f"Created data.yaml at {yaml_path}")
         return str(yaml_path)
     
-    def train_model(self, 
-                   model_size: str = 'n',
-                   epochs: int = 100,
-                   imgsz: int = 640,
-                   batch: int = 16,
-                   data_yaml: Optional[str] = None) -> str:
-        """
-        Train YOLO model.
-        
-        Args:
-            model_size (str): Kích thước model ('n', 's', 'm', 'l', 'x')
-            epochs (int): Số epochs
-            imgsz (int): Kích thước ảnh đầu vào
-            batch (int): Batch size
-            data_yaml (Optional[str]): Đường dẫn data.yaml
-        
-        Returns:
-            str: Đường dẫn model đã train
-        """
+    def train_model(self, model_size: str = 'n', epochs: int = 100, 
+                   imgsz: int = 640, batch: int = 16, 
+                   data_yaml: Optional[str] = None, device: str = 'cpu') -> str:
+        """Train YOLO model."""
         if data_yaml is None:
             data_yaml = self.create_data_yaml()
         
-        logger.info(f"Bắt đầu training YOLO11{model_size} model...")
-        logger.info(f"Epochs: {epochs}, Image size: {imgsz}, Batch: {batch}")
+        logger.info(f"Training YOLO11{model_size} model...")
+        logger.info(f"Epochs: {epochs}, Image size: {imgsz}, Batch: {batch}, Device: {device}")
         
-        # Khởi tạo model
         model = YOLO(f'yolo11{model_size}.pt')
         
-        # Train
-        results = model.train(
+        model.train(
             data=data_yaml,
             epochs=epochs,
             imgsz=imgsz,
@@ -227,42 +161,43 @@ class YOLOTrainer:
             patience=50,
             save=True,
             plots=True,
-            device='cpu'  # Có thể đổi thành 'cuda' hoặc 'mps'
+            device=device
         )
         
         best_model_path = self.output_dir / 'train' / 'weights' / 'best.pt'
-        logger.info(f"Training hoàn tất! Model được lưu tại: {best_model_path}")
+        logger.info(f"Training complete! Model saved at: {best_model_path}")
         
         return str(best_model_path)
     
-    def convert_annotations_from_labelimg(self, labelimg_dir: str) -> None:
-        """
-        Convert annotations từ LabelImg format sang YOLO format.
+    def convert_labelimg_annotations(self, labelimg_dir: str) -> None:
+        """Convert LabelImg XML annotations to YOLO format."""
+        logger.info("Converting LabelImg annotations to YOLO format...")
         
-        Args:
-            labelimg_dir (str): Thư mục chứa annotations từ LabelImg (XML format)
-        """
-        import xml.etree.ElementTree as ET
-        
-        logger.info("Đang convert annotations từ LabelImg format...")
-        
-        labelimg_path = Path(labelimg_dir)
-        
-        for xml_file in labelimg_path.glob("*.xml"):
+        for xml_file in Path(labelimg_dir).glob("*.xml"):
             try:
                 tree = ET.parse(xml_file)
                 root = tree.getroot()
                 
-                # Lấy kích thước ảnh
                 size = root.find('size')
-                img_width = int(size.find('width').text)
-                img_height = int(size.find('height').text)
+                if size is None:
+                    continue
+                    
+                width_elem = size.find('width')
+                height_elem = size.find('height')
+                if width_elem is None or width_elem.text is None or height_elem is None or height_elem.text is None:
+                    continue
+                    
+                img_width = int(width_elem.text)
+                img_height = int(height_elem.text)
                 
                 annotations = []
                 
-                # Parse objects
                 for obj in root.findall('object'):
-                    class_name = obj.find('name').text
+                    name_elem = obj.find('name')
+                    if name_elem is None or name_elem.text is None:
+                        continue
+                        
+                    class_name = name_elem.text
                     
                     if class_name not in self.classes:
                         self.classes.append(class_name)
@@ -270,84 +205,102 @@ class YOLOTrainer:
                     class_id = self.classes.index(class_name)
                     
                     bbox = obj.find('bndbox')
-                    xmin = int(bbox.find('xmin').text)
-                    ymin = int(bbox.find('ymin').text)
-                    xmax = int(bbox.find('xmax').text)
-                    ymax = int(bbox.find('ymax').text)
+                    if bbox is None:
+                        continue
+                        
+                    xmin_elem = bbox.find('xmin')
+                    ymin_elem = bbox.find('ymin')
+                    xmax_elem = bbox.find('xmax')
+                    ymax_elem = bbox.find('ymax')
                     
-                    # Convert sang YOLO format
+                    if (xmin_elem is None or xmin_elem.text is None or
+                        ymin_elem is None or ymin_elem.text is None or
+                        xmax_elem is None or xmax_elem.text is None or
+                        ymax_elem is None or ymax_elem.text is None):
+                        continue
+                    
+                    xmin = int(xmin_elem.text)
+                    ymin = int(ymin_elem.text)
+                    xmax = int(xmax_elem.text)
+                    ymax = int(ymax_elem.text)
+                    
+                    # Convert to YOLO format
                     x_center = ((xmin + xmax) / 2) / img_width
                     y_center = ((ymin + ymax) / 2) / img_height
                     width = (xmax - xmin) / img_width
                     height = (ymax - ymin) / img_height
                     
-                    annotations.append(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}")
+                    annotations.append(
+                        f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}"
+                    )
                 
-                # Lưu annotation
-                txt_file = xml_file.with_suffix('.txt')
-                with open(txt_file, 'w') as f:
-                    f.write('\n'.join(annotations))
+                if annotations:
+                    xml_file.with_suffix('.txt').write_text('\n'.join(annotations))
                 
             except Exception as e:
-                logger.error(f"Lỗi convert {xml_file}: {e}")
+                logger.error(f"Error converting {xml_file}: {e}")
         
-        logger.info("Hoàn tất convert annotations")
+        logger.info("Annotation conversion complete")
+
+    def prepare_dataset(self, backgrounds: Optional[List[str]] = None, 
+                       num_samples: int = 100) -> None:
+        """Prepare complete dataset."""
+        logger.info("=== Preparing Dataset ===")
+        self._create_dirs()
+        self._load_classes()
+        
+        if backgrounds:
+            self.create_synthetic_data(backgrounds, num_samples)
+        else:
+            logger.warning("No backgrounds provided. Add images/labels manually.")
+        
+        self.create_data_yaml()
 
 
 def main():
-    """Main function để demo usage."""
+    """CLI entry point."""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Train YOLO model cho item detection')
+    parser = argparse.ArgumentParser(description='Train YOLO model for item detection')
     parser.add_argument('--templates-dir', type=str, default='templates',
-                       help='Thư mục chứa template images')
+                       help='Directory containing template images')
     parser.add_argument('--output-dir', type=str, default='yolo_dataset',
-                       help='Thư mục output cho dataset')
+                       help='Output directory for dataset')
     parser.add_argument('--mode', type=str, choices=['prepare', 'train', 'full'],
-                       default='full', help='Mode: prepare dataset, train model, hoặc full pipeline')
+                       default='full', help='Operation mode')
     parser.add_argument('--backgrounds', type=str, nargs='+',
-                       help='Danh sách đường dẫn background images cho synthetic data')
+                       help='Background image paths for synthetic data')
     parser.add_argument('--num-samples', type=int, default=100,
-                       help='Số lượng synthetic samples')
+                       help='Number of synthetic samples')
     parser.add_argument('--model-size', type=str, default='n',
                        choices=['n', 's', 'm', 'l', 'x'],
-                       help='Kích thước YOLO model')
+                       help='YOLO model size')
     parser.add_argument('--epochs', type=int, default=100,
-                       help='Số epochs training')
+                       help='Training epochs')
     parser.add_argument('--batch', type=int, default=16,
                        help='Batch size')
+    parser.add_argument('--device', type=str, default='cpu',
+                       choices=['cpu', 'cuda', 'mps'],
+                       help='Training device')
     
     args = parser.parse_args()
     
     trainer = YOLOTrainer(args.templates_dir, args.output_dir)
     
     if args.mode in ['prepare', 'full']:
-        logger.info("=== Preparing dataset ===")
-        trainer.create_dataset_structure()
-        trainer.load_class_names()
-        
-        if args.backgrounds:
-            trainer.create_synthetic_data(
-                background_images=args.backgrounds,
-                num_samples=args.num_samples
-            )
-        else:
-            logger.warning("Không có background images. Bỏ qua tạo synthetic data.")
-            logger.info("Bạn có thể tự thêm images và labels vào thư mục train/val/test")
-        
-        trainer.create_data_yaml()
+        trainer.prepare_dataset(args.backgrounds, args.num_samples)
     
     if args.mode in ['train', 'full']:
-        logger.info("=== Training model ===")
+        logger.info("=== Training Model ===")
         model_path = trainer.train_model(
             model_size=args.model_size,
             epochs=args.epochs,
-            batch=args.batch
+            batch=args.batch,
+            device=args.device
         )
-        logger.info(f"Model đã được train và lưu tại: {model_path}")
-        logger.info(f"Để sử dụng model này, cập nhật 'model_path' trong config.py: YOLO_CONFIG['model_path'] = '{model_path}'")
+        logger.info(f"Model trained and saved at: {model_path}")
+        logger.info(f"Update YOLO_CONFIG['model_path'] = '{model_path}' in config.py")
 
 
 if __name__ == "__main__":
     main()
-

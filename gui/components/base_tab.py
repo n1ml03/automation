@@ -4,12 +4,11 @@ Eliminates code duplication across Festival/Gacha/Hopping tabs
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, messagebox
 import threading
-import json
 import os
 from datetime import datetime
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 from core.agent import Agent
 from core.utils import get_logger
 from core.config import DEFAULT_PATHS
@@ -262,7 +261,7 @@ class BaseAutomationTab(ttk.Frame):
 
     def preview_data(self):
         """Preview data from selected file with enhanced table view and performance optimization."""
-        from core import data as data_module
+        from core.data import load_data
 
         file_path = self.file_path_var.get()
         if not file_path or not os.path.exists(file_path):
@@ -270,7 +269,7 @@ class BaseAutomationTab(ttk.Frame):
             return
 
         try:
-            data_list = data_module.load_data(file_path)
+            data_list = load_data(file_path)
             if not data_list:
                 messagebox.showwarning("Warning", "File contains no data!")
                 return

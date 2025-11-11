@@ -2,7 +2,6 @@
 Agent Module - Device interaction and OCR with enhanced performance.
 """
 import time
-import copy
 import cv2
 import numpy as np
 import oneocr
@@ -19,25 +18,15 @@ class EnhancedOcrEngine(oneocr.OcrEngine):
     def recognize(self, image_array: np.ndarray) -> dict:
         """Process image from NumPy array efficiently without encode/decode overhead."""
         if any(x < 50 or x > 10000 for x in image_array.shape[:2]):
-            result = copy.deepcopy(self.empty_result)
-            result['error'] = 'Unsupported image size'
-            return result
-
+            return {**self.empty_result, 'error': 'Unsupported image size'}
+        
         channels = image_array.shape[2] if len(image_array.shape) == 3 else 1
-
-        if channels == 1:
-            img_bgra = cv2.cvtColor(image_array, cv2.COLOR_GRAY2BGRA)
-        elif channels == 3:
-            img_bgra = cv2.cvtColor(image_array, cv2.COLOR_BGR2BGRA)
-        else:
-            img_bgra = image_array
-
-        return self._process_image(
-            cols=img_bgra.shape[1],
-            rows=img_bgra.shape[0],
-            step=img_bgra.shape[1] * 4,
-            data=img_bgra.ctypes.data
-        )
+        conversions = {1: cv2.COLOR_GRAY2BGRA, 3: cv2.COLOR_BGR2BGRA}
+        img_bgra = cv2.cvtColor(image_array, conversions[channels]) if channels in conversions else image_array
+        
+        width = img_bgra.shape[1]
+        return self._process_image(cols=width, rows=img_bgra.shape[0], 
+                                   step=width * 4, data=img_bgra.ctypes.data)
 
 # ==================== AGENT CLASS ====================
 
@@ -75,7 +64,7 @@ class Agent:
             self.logger.error(f"Agent initialization failed: {e}")
             raise RuntimeError(f"Agent initialization failed: {e}") from e
 
-    def connect_device_with_retry(self, device_url: str = "Windows:///?title_re=DOAX",
+    def connect_device_with_retry(self, device_url: str = "Windows:///?title_re=DOAX VenusVacation.*",
                                   max_retries: int = DEFAULT_MAX_RETRIES,
                                   retry_delay: float = DEFAULT_RETRY_DELAY) -> bool:
         """Connect to device with automatic retry on failure."""

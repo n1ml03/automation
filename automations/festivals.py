@@ -20,16 +20,14 @@ Standard flow:
 16. Repeat
 """
 
-import os
-import time
-import cv2
-import re
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
-from airtest.core.api import Template, exists, sleep
+from airtest.core.api import sleep
+
+from core.base import BaseAutomation
 from core.agent import Agent
-from core.utils import get_logger, ensure_directory
-from core.data import ResultWriter, load_json, load_csv
+from core.utils import get_logger
+from core.data import ResultWriter, load_data
 from core.config import (
     FESTIVALS_ROI_CONFIG, get_festivals_roi_config,
     FESTIVAL_CONFIG, get_festival_config, merge_config
@@ -39,35 +37,24 @@ from core.detector import YOLODetector, TemplateMatcher, YOLO_AVAILABLE
 logger = get_logger(__name__)
 
 
-class FestivalAutomation:
+class FestivalAutomation(BaseAutomation):
     """Festival automation - keep only essential steps."""
 
     def __init__(self, agent: Agent, config: Optional[Dict[str, Any]] = None):
-        self.agent = agent
-        
         # Merge config: base config from FESTIVAL_CONFIG + custom config
         base_config = get_festival_config()
         cfg = merge_config(base_config, config) if config else base_config
 
-        # Paths
-        self.templates_path = cfg['templates_path']
-        self.snapshot_dir = cfg['snapshot_dir']
-        self.results_dir = cfg['results_dir']
-        
-        # Timing
-        self.wait_after_touch = cfg['wait_after_touch']
-
-        # Ensure directories exist
-        ensure_directory(self.snapshot_dir)
-        ensure_directory(self.results_dir)
+        # Initialize base class with agent, config, and ROI config
+        super().__init__(agent, cfg, FESTIVALS_ROI_CONFIG)
 
         # Initialize detector (YOLO or Template Matching)
         self.detector = None
         self.use_detector = cfg.get('use_detector')
-        
+
         if self.use_detector:
             detector_type = cfg.get('detector_type', 'template')  # 'yolo', 'template', 'auto'
-            
+
             if detector_type == 'auto':
                 # Auto-select: prefer YOLO, fallback to Template
                 if YOLO_AVAILABLE:
@@ -94,7 +81,7 @@ class FestivalAutomation:
                         threshold=template_config.get('threshold', 0.85)
                     )
                     logger.info("Using Template Matcher")
-            
+
             elif detector_type == 'yolo':
                 yolo_config = cfg.get('yolo_config', {})
                 self.detector = YOLODetector(
@@ -104,7 +91,7 @@ class FestivalAutomation:
                     device=yolo_config.get('device', 'cpu')
                 )
                 logger.info("Using YOLO Detector")
-            
+
             elif detector_type == 'template':
                 template_config = cfg.get('template_config', {})
                 self.detector = TemplateMatcher(
@@ -114,174 +101,6 @@ class FestivalAutomation:
                 logger.info("Using Template Matcher")
 
         logger.info("FestivalAutomation initialized")
-
-    def touch_template(self, template_name: str, optional: bool = False) -> bool:
-        """Touch template image."""
-        try:
-            template_path = os.path.join(self.templates_path, template_name)
-            if not os.path.exists(template_path):
-                return optional
-
-            if self.agent.device is None:
-                logger.error("Device not connected")
-                return False
-
-            template = Template(template_path)
-            pos = exists(template)
-
-            if pos:
-                self.agent.safe_touch(pos)
-                logger.info(f"✓ {template_name}")
-                sleep(self.wait_after_touch)
-                return True
-
-            return optional if optional else False
-
-        except Exception as e:
-            logger.error(f"✗ {template_name}: {e}") if not optional else None
-            return optional
-
-    def snapshot_and_save(self, folder_name: str, filename: str) -> Optional[Any]:
-        """Take screenshot and save to folder."""
-        try:
-            screenshot = self.agent.snapshot()
-            if screenshot is None:
-                return None
-
-            folder_path = os.path.join(self.snapshot_dir, folder_name)
-            ensure_directory(folder_path)
-            file_path = os.path.join(folder_path, filename)
-            cv2.imwrite(file_path, screenshot)
-            logger.info(f"✓ Saved: {filename}")
-            return screenshot
-
-        except Exception as e:
-            logger.error(f"✗ Snapshot: {e}")
-            return None
-
-    def snapshot_and_ocr(self) -> List[Dict[str, Any]]:
-        """Take screenshot and OCR to get text + coordinates."""
-        try:
-            screenshot = self.agent.snapshot()
-            if screenshot is None:
-                return []
-
-            if self.agent.ocr_engine is None:
-                logger.error("OCR engine not initialized")
-                return []
-
-            ocr_results = self.agent.ocr_engine.recognize_cv2(screenshot)
-            lines = ocr_results.get('lines', [])
-
-            results = []
-            for line in lines:
-                text = line.get('text', '').strip()
-                bbox = line.get('bounding_rect', {})
-                if text and bbox:
-                    center_x = (bbox.get('x1', 0) + bbox.get('x3', 0)) / 2
-                    center_y = (bbox.get('y1', 0) + bbox.get('y3', 0)) / 2
-                    results.append({'text': text, 'center': (center_x, center_y)})
-
-            logger.info(f"OCR: {len(results)} texts")
-            return results
-
-        except Exception as e:
-            logger.error(f"✗ OCR: {e}")
-            return []
-
-    def find_text(self, ocr_results: List[Dict[str, Any]], search_text: str) -> Optional[Dict[str, Any]]:
-        """Find text in OCR results."""
-        search_lower = search_text.lower().strip()
-        for result in ocr_results:
-            if search_lower in result['text'].lower():
-                return result
-        return None
-
-    def find_and_touch(self, search_text: str) -> bool:
-        """Find text with OCR and touch."""
-        logger.info(f"Find & touch: {search_text}")
-        ocr_results = self.snapshot_and_ocr()
-        text_info = self.find_text(ocr_results, search_text)
-
-        if text_info:
-            logger.info(f"✓ Found: {search_text}")
-            success = self.agent.safe_touch(text_info['center'])
-            if success:
-                sleep(self.wait_after_touch)
-            return success
-
-        logger.warning(f"✗ Not found: {search_text}")
-        return False
-
-    def ocr_roi(self, roi_name: str, screenshot: Optional[Any] = None) -> str:
-        """
-        OCR specific ROI region.
-
-        Args:
-            roi_name: ROI name in FESTIVALS_ROI_CONFIG
-            screenshot: Screenshot for OCR, None = take new
-
-        Returns:
-            str: OCR text from ROI region (cleaned)
-        """
-        try:
-            # Get ROI config
-            roi_config = get_festivals_roi_config(roi_name)
-            coords = roi_config['coords']  # [x1, x2, y1, y2]
-
-            # Convert to (x1, y1, x2, y2) format for snapshot_region
-            x1, x2, y1, y2 = coords
-            region = (x1, y1, x2, y2)
-
-            # Take screenshot or crop ROI region
-            if screenshot is None:
-                roi_image = self.agent.snapshot_region(region)
-            else:
-                # Crop from existing screenshot
-                roi_image = screenshot[y1:y2, x1:x2]
-
-            if roi_image is None:
-                logger.warning(f"✗ ROI '{roi_name}': Cannot get image")
-                return ""
-
-            # OCR ROI region
-            if self.agent.ocr_engine is None:
-                logger.error("OCR engine not initialized")
-                return ""
-
-            ocr_result = self.agent.ocr_engine.recognize_cv2(roi_image)
-            text = ocr_result.get('text', '').strip()
-
-            # Clean text
-            text = self._clean_ocr_text(text)
-
-            logger.debug(f"ROI '{roi_name}': '{text}'")
-            return text
-
-        except Exception as e:
-            logger.error(f"✗ OCR ROI '{roi_name}': {e}")
-            return ""
-
-    def _clean_ocr_text(self, text: str) -> str:
-        """
-        Clean OCR text (remove special chars, normalize).
-
-        Args:
-            text: Text to clean
-
-        Returns:
-            str: Cleaned text
-        """
-        if not text:
-            return ""
-
-        # Remove extra whitespace
-        text = ' '.join(text.split())
-
-        # Remove newlines
-        text = text.replace('\n', ' ').replace('\r', '')
-
-        return text.strip()
 
     def detect_and_ocr_roi(self, roi_name: str, screenshot: Optional[Any] = None) -> Dict[str, Any]:
         """
@@ -319,26 +138,43 @@ class FestivalAutomation:
             roi_config = get_festivals_roi_config(roi_name)
             coords = roi_config['coords']  # [x1, x2, y1, y2]
             x1, x2, y1, y2 = coords
-
-            # Get screenshot if not provided
-            if screenshot is None:
-                screenshot = self.agent.snapshot()
-                if screenshot is None:
-                    logger.warning(f"✗ Cannot get screenshot for ROI '{roi_name}'")
-                    return result
-
-            # Crop ROI region
-            roi_image = screenshot[y1:y2, x1:x2]
-            if roi_image is None or roi_image.size == 0:
-                logger.warning(f"✗ ROI '{roi_name}': Invalid crop")
-                return result
+            region = (x1, y1, x2, y2)
 
             # Step 1: Traditional OCR (always runs)
-            if self.agent.ocr_engine is not None:
-                ocr_result = self.agent.ocr_engine.recognize_cv2(roi_image)
+            if screenshot is None:
+                # Use agent.ocr() with region - more efficient
+                ocr_result = self.agent.ocr(region)
+                if ocr_result is None:
+                    logger.warning(f"✗ Cannot OCR ROI '{roi_name}'")
+                    return result
                 text = self._clean_ocr_text(ocr_result.get('text', ''))
                 result['text'] = text
                 logger.debug(f"ROI '{roi_name}' OCR: '{text}'")
+                
+                # Get screenshot for detector if needed
+                screenshot = self.agent.snapshot()
+                if screenshot is None:
+                    logger.warning(f"✗ Cannot get screenshot for detector")
+                    return result
+            else:
+                # Use existing screenshot
+                if self.agent.ocr_engine is not None:
+                    ocr_result = self.agent.ocr(region) if screenshot is None else None
+                    if ocr_result is None:
+                        roi_image = screenshot[y1:y2, x1:x2]
+                        if roi_image is None or roi_image.size == 0:
+                            logger.warning(f"✗ ROI '{roi_name}': Invalid crop")
+                            return result
+                        ocr_result = self.agent.ocr_engine.recognize(roi_image)
+                    text = self._clean_ocr_text(ocr_result.get('text', ''))
+                    result['text'] = text
+                    logger.debug(f"ROI '{roi_name}' OCR: '{text}'")
+
+            # Crop ROI for detector
+            roi_image = screenshot[y1:y2, x1:x2]
+            if roi_image is None or roi_image.size == 0:
+                logger.warning(f"✗ ROI '{roi_name}': Invalid crop for detector")
+                return result
 
             # Step 2: Detection (if detector available)
             if self.detector is not None:
@@ -355,7 +191,7 @@ class FestivalAutomation:
                         quantity = det.get('quantity', 0)
                         confidence = det.get('confidence', 0)
                         logger.debug(f"  - {item_name} x{quantity} (conf: {confidence:.2f})")
-                        
+
                         # Save quantity from first detection
                         if quantity > 0 and not result['has_quantity']:
                             result['has_quantity'] = True
@@ -370,48 +206,6 @@ class FestivalAutomation:
         except Exception as e:
             logger.error(f"✗ Detect & OCR ROI '{roi_name}': {e}")
             return result
-
-    def scan_screen_roi(self, screenshot: Optional[Any] = None,
-                       roi_names: Optional[List[str]] = None) -> Dict[str, Any]:
-        """
-        Scan screen according to defined ROI regions.
-
-        Args:
-            screenshot: Screenshot to scan, None = take new
-            roi_names: List of ROI names to scan, None = scan all
-
-        Returns:
-            Dict[str, Any]: Dictionary with ROI name as key, OCR text as value
-        """
-        try:
-            # Get screenshot if not provided
-            if screenshot is None:
-                screenshot = self.agent.snapshot()
-                if screenshot is None:
-                    logger.error("Cannot get screenshot")
-                    return {}
-
-            # Determine ROI list to scan
-            if roi_names is None:
-                roi_names = list(FESTIVALS_ROI_CONFIG.keys())
-
-            # OCR each ROI
-            results = {}
-            for roi_name in roi_names:
-                try:
-                    text = self.ocr_roi(roi_name, screenshot)
-                    results[roi_name] = text
-                    logger.debug(f"✓ {roi_name}: '{text}'")
-                except Exception as e:
-                    logger.warning(f"✗ {roi_name}: {e}")
-                    results[roi_name] = ""
-
-            logger.info(f"Scanned {len(results)} ROIs")
-            return results
-
-        except Exception as e:
-            logger.error(f"✗ Scan screen ROI: {e}")
-            return {}
 
     def scan_screen_roi_with_detector(self, screenshot: Optional[Any] = None,
                                      roi_names: Optional[List[str]] = None,
@@ -621,7 +415,7 @@ class FestivalAutomation:
                 return False
 
             # Wait for festival menu to load
-            sleep(1.0)
+            sleep(0.5)
 
             # Step 2: Touch Event
             logger.info("Step 2: Touch Event")
@@ -630,7 +424,7 @@ class FestivalAutomation:
                 return False
 
             # Wait for event screen to load
-            sleep(1.5)
+            sleep(0.5)
 
             # Step 3: Snapshot before touch
             logger.info("Step 3: Snapshot before touch")
@@ -650,7 +444,7 @@ class FestivalAutomation:
                 return False
 
             # Wait for screen transition after touch
-            sleep(2.0)
+            sleep(0.5)
 
             # Step 5: Snapshot after touch
             logger.info("Step 5: Snapshot after touch")
@@ -704,7 +498,7 @@ class FestivalAutomation:
 
             # Wait for battle to complete
             logger.info("Waiting for battle completion...")
-            sleep(3.0)
+            sleep(2.0)
 
             # Step 11: Touch Result
             logger.info("Step 11: Touch Result")
@@ -768,7 +562,7 @@ class FestivalAutomation:
         """
         try:
             # Load data
-            stages_data = load_json(data_path) if data_path.endswith('.json') else load_csv(data_path)
+            stages_data = load_data(data_path)
             if not stages_data:
                 return False
 
@@ -776,10 +570,10 @@ class FestivalAutomation:
             if output_path is None:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 detector_suffix = "_detector" if use_detector else ""
-                output_path = os.path.join(self.results_dir, f"results_{timestamp}{detector_suffix}.csv")
+                output_path = f"{self.results_dir}/results_{timestamp}{detector_suffix}.csv"
 
             result_writer = ResultWriter(output_path)
-            
+
             # Log mode
             mode = "Detector + OCR" if use_detector and self.detector else "OCR only"
             logger.info(f"Mode: {mode} | Stages: {len(stages_data)} | Output: {output_path}")
@@ -824,4 +618,3 @@ class FestivalAutomation:
         success = self.run_all_stages(data_path, use_detector=use_detector)
         logger.info("="*70 + f"\n{'✓ COMPLETED' if success else '✗ FAILED'}\n" + "="*70)
         return success
-

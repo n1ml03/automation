@@ -13,211 +13,44 @@ Gacha flow:
 9. Repeat according to pull count
 """
 
-import os
-import time
-import cv2
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Any
 from datetime import datetime
-from airtest.core.api import Template, exists, sleep
+from airtest.core.api import sleep
+
+from core.base import BaseAutomation
 from core.agent import Agent
-from core.utils import get_logger, ensure_directory
-from core.data import ResultWriter, load_json, load_csv
+from core.utils import get_logger
+from core.data import ResultWriter, load_data
 from core.config import (
-    GACHA_ROI_CONFIG, get_gacha_roi_config,
-    GACHA_CONFIG, get_gacha_config, merge_config
+    GACHA_ROI_CONFIG, get_gacha_config, merge_config
 )
 
 logger = get_logger(__name__)
 
 
-class GachaAutomation:
+class GachaAutomation(BaseAutomation):
     """Automate Gacha pulls."""
 
     def __init__(self, agent: Agent, config: Optional[Dict[str, Any]] = None):
-        self.agent = agent
-        
         # Merge config: base config from GACHA_CONFIG + custom config
         base_config = get_gacha_config()
         cfg = merge_config(base_config, config) if config else base_config
 
-        # Paths
-        self.templates_path = cfg['templates_path']
-        self.snapshot_dir = cfg['snapshot_dir']
-        self.results_dir = cfg['results_dir']
-        
-        # Timing
-        self.wait_after_touch = cfg['wait_after_touch']
+        # Initialize base class with agent, config, and ROI config
+        super().__init__(agent, cfg, GACHA_ROI_CONFIG)
+
+        # Gacha-specific timing
         self.wait_after_pull = cfg['wait_after_pull']
-        
+
         # Pull settings
         self.max_pulls = cfg['max_pulls']
         self.pull_type = cfg['pull_type']
 
-        # Ensure directories exist
-        ensure_directory(self.snapshot_dir)
-        ensure_directory(self.results_dir)
-
         logger.info("GachaAutomation initialized")
-
-    def touch_template(self, template_name: str, optional: bool = False) -> bool:
-        """Touch template image."""
-        try:
-            template_path = os.path.join(self.templates_path, template_name)
-            if not os.path.exists(template_path):
-                return optional
-
-            if self.agent.device is None:
-                logger.error("Device not connected")
-                return False
-
-            template = Template(template_path)
-            pos = exists(template)
-
-            if pos:
-                self.agent.safe_touch(pos)
-                logger.info(f"✓ {template_name}")
-                sleep(self.wait_after_touch)
-                return True
-
-            return optional if optional else False
-
-        except Exception as e:
-            logger.error(f"✗ {template_name}: {e}") if not optional else None
-            return optional
-
-    def snapshot_and_save(self, folder_name: str, filename: str) -> Optional[Any]:
-        """Take screenshot and save to folder."""
-        try:
-            screenshot = self.agent.snapshot()
-            if screenshot is None:
-                return None
-
-            folder_path = os.path.join(self.snapshot_dir, folder_name)
-            ensure_directory(folder_path)
-            file_path = os.path.join(folder_path, filename)
-            cv2.imwrite(file_path, screenshot)
-            logger.info(f"✓ Saved: {filename}")
-            return screenshot
-
-        except Exception as e:
-            logger.error(f"✗ Snapshot: {e}")
-            return None
-
-    def ocr_roi(self, roi_name: str, screenshot: Optional[Any] = None) -> str:
-        """
-        OCR specific ROI region for Gacha.
-
-        Args:
-            roi_name: ROI name in GACHA_ROI_CONFIG
-            screenshot: Screenshot for OCR, None = take new
-
-        Returns:
-            str: OCR text from ROI region (cleaned)
-        """
-        try:
-            # Get ROI config
-            roi_config = get_gacha_roi_config(roi_name)
-            coords = roi_config['coords']  # [x1, x2, y1, y2]
-
-            # Convert to (x1, y1, x2, y2) format for snapshot_region
-            x1, x2, y1, y2 = coords
-            region = (x1, y1, x2, y2)
-
-            # Take screenshot or crop ROI region
-            if screenshot is None:
-                roi_image = self.agent.snapshot_region(region)
-            else:
-                # Crop from existing screenshot
-                roi_image = screenshot[y1:y2, x1:x2]
-
-            if roi_image is None:
-                logger.warning(f"✗ ROI '{roi_name}': Cannot get image")
-                return ""
-
-            # OCR ROI region
-            if self.agent.ocr_engine is None:
-                logger.error("OCR engine not initialized")
-                return ""
-
-            ocr_result = self.agent.ocr_engine.recognize_cv2(roi_image)
-            text = ocr_result.get('text', '').strip()
-
-            # Clean text
-            text = self._clean_ocr_text(text)
-
-            logger.debug(f"ROI '{roi_name}': '{text}'")
-            return text
-
-        except Exception as e:
-            logger.error(f"✗ OCR ROI '{roi_name}': {e}")
-            return ""
-
-    def _clean_ocr_text(self, text: str) -> str:
-        """
-        Clean OCR text (remove special chars, normalize).
-
-        Args:
-            text: Text to clean
-
-        Returns:
-            str: Cleaned text
-        """
-        if not text:
-            return ""
-
-        # Remove extra whitespace
-        text = ' '.join(text.split())
-
-        # Remove newlines
-        text = text.replace('\n', ' ').replace('\r', '')
-
-        return text.strip()
-
-    def scan_screen_roi(self, screenshot: Optional[Any] = None,
-                         roi_names: Optional[List[str]] = None) -> Dict[str, Any]:
-        """
-        Scan screen according to defined ROI regions (consistent with festivals).
-
-        Args:
-            screenshot: Screenshot to scan, None = take new
-            roi_names: List of ROI names to scan, None = scan all
-
-        Returns:
-            Dict[str, Any]: Dictionary with ROI name as key, OCR text as value
-        """
-        try:
-            # Get screenshot if not provided
-            if screenshot is None:
-                screenshot = self.agent.snapshot()
-                if screenshot is None:
-                    logger.error("Cannot get screenshot")
-                    return {}
-
-            # Determine ROI list to scan
-            if roi_names is None:
-                roi_names = list(GACHA_ROI_CONFIG.keys())
-
-            # OCR each ROI
-            results = {}
-            for roi_name in roi_names:
-                try:
-                    text = self.ocr_roi(roi_name, screenshot)
-                    results[roi_name] = text
-                    logger.debug(f"✓ {roi_name}: '{text}'")
-                except Exception as e:
-                    logger.warning(f"✗ {roi_name}: {e}")
-                    results[roi_name] = ""
-
-            logger.info(f"Scanned {len(results)} ROIs")
-            return results
-
-        except Exception as e:
-            logger.error(f"✗ Scan screen ROI: {e}")
-            return {}
 
     def run_gacha_stage(self, pull_data: Dict[str, Any], pull_idx: int,
                       pull_type: str = "single") -> Dict[str, Any]:
-        """Run gacha stage (consistent with festivals: run_xxx_stage)."""
+        """Run gacha stage."""
         logger.info(f"\n{'='*50}\nPULL {pull_idx}: {pull_type.upper()}\n{'='*50}")
 
         folder_name = f"gacha_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -255,7 +88,7 @@ class GachaAutomation:
             # Step 5: Skip animation if exists
             logger.info("Step 5: Skip animation")
             self.touch_template("tpl_skip.png", optional=True)
-            sleep(2.0)  # Wait for result
+            sleep(0.5)  # Wait for result
 
             # Step 6: Snapshot result
             logger.info("Step 6: Snapshot result")
@@ -294,7 +127,7 @@ class GachaAutomation:
     def run_all_pulls(self, data_path: Optional[str] = None, num_pulls: Optional[int] = None,
                       pull_type: str = "single", output_path: Optional[str] = None) -> bool:
         """
-        Run all pulls (consistent with festivals: run_all_xxx).
+        Run all pulls.
 
         Args:
             data_path: Path to CSV/JSON file with test data (mode 1)
@@ -308,55 +141,55 @@ class GachaAutomation:
         try:
             # Mode 1: Load from data file
             if data_path:
-                test_data = load_json(data_path) if data_path.endswith('.json') else load_csv(data_path)
+                test_data = load_data(data_path)
                 if not test_data:
                     logger.error("✗ No data loaded")
                     return False
-                
+
                 # Setup output
                 if output_path is None:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    output_path = os.path.join(self.results_dir, f"gacha_batch_{timestamp}.csv")
-                
+                    output_path = f"{self.results_dir}/gacha_batch_{timestamp}.csv"
+
                 result_writer = ResultWriter(output_path)
                 logger.info(f"Batch sessions: {len(test_data)} | Output: {output_path}")
-                
+
                 all_success = True
-                
+
                 # Process each session from data
                 for idx, session_data in enumerate(test_data, 1):
                     session_id = session_data.get('session_id', idx)
                     session_num_pulls = int(session_data.get('num_pulls', 1))
                     session_pull_type = session_data.get('pull_type', 'single')
-                    
+
                     # Override timing configs if provided
                     if 'wait_after_pull' in session_data:
                         self.wait_after_pull = float(session_data['wait_after_pull'])
                     if 'wait_after_touch' in session_data:
                         self.wait_after_touch = float(session_data['wait_after_touch'])
-                    
+
                     logger.info(f"\n{'='*60}\nSESSION {idx}/{len(test_data)}: {session_num_pulls} {session_pull_type} pull(s)\n{'='*60}")
-                    
+
                     # Run pulls for this session
                     session_start = datetime.now()
                     successful_pulls = 0
                     rarity_counts = {}
-                    
+
                     for pull_idx in range(1, session_num_pulls + 1):
                         pull_result = self.run_gacha_stage({}, pull_idx, session_pull_type)
                         if pull_result['success']:
                             successful_pulls += 1
                             rarity = pull_result.get('rarity', 'Unknown')
                             rarity_counts[rarity] = rarity_counts.get(rarity, 0) + 1
-                        sleep(1.0)
-                    
+                        sleep(0.5)
+
                     session_end = datetime.now()
                     session_duration = (session_end - session_start).total_seconds()
                     session_success = successful_pulls == session_num_pulls
-                    
+
                     if not session_success:
                         all_success = False
-                    
+
                     # Add session summary
                     result_writer.add_result(
                         test_case={
@@ -372,22 +205,22 @@ class GachaAutomation:
                         result=ResultWriter.RESULT_OK if session_success else ResultWriter.RESULT_NG,
                         error_message=None if session_success else f"Only {successful_pulls}/{session_num_pulls} pulls succeeded"
                     )
-                    
+
                     logger.info(f"Session {idx} completed: {successful_pulls}/{session_num_pulls} successful")
                     logger.info(f"Rarity distribution: {rarity_counts}")
-                    sleep(2.0)
-                
+                    sleep(0.5)
+
                 # Save results
                 result_writer.write()
                 result_writer.print_summary()
                 return all_success
-            
+
             # Mode 2: Direct num_pulls
             elif num_pulls:
                 # Setup output
                 if output_path is None:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    output_path = os.path.join(self.results_dir, f"gacha_results_{timestamp}.csv")
+                    output_path = f"{self.results_dir}/gacha_results_{timestamp}.csv"
 
                 result_writer = ResultWriter(output_path)
                 logger.info(f"Gacha pulls: {num_pulls} {pull_type} | Output: {output_path}")
@@ -410,7 +243,7 @@ class GachaAutomation:
                                            ResultWriter.RESULT_OK if pull_result['success'] else ResultWriter.RESULT_NG,
                                            error_message=None if pull_result['success'] else "Pull failed")
 
-                    sleep(1.0)
+                    sleep(0.5)
 
                 # Save results
                 result_writer.write()
@@ -429,7 +262,7 @@ class GachaAutomation:
                 logger.info(f"Rarity distribution: {rarity_counts}")
 
                 return True
-            
+
             else:
                 logger.error("✗ Either 'data_path' or 'num_pulls' must be provided")
                 return False
@@ -440,7 +273,7 @@ class GachaAutomation:
 
     def run(self, config: Optional[Dict[str, Any]] = None, data_path: Optional[str] = None) -> bool:
         """
-        Main entry point for Gacha automation (consistent with festivals).
+        Main entry point for Gacha automation.
 
         Supports 2 modes:
         1. Config mode: Pass config dict with num_pulls, pull_type
@@ -465,7 +298,7 @@ class GachaAutomation:
         if not self.agent.is_device_connected():
             logger.error("✗ Device not connected")
             return False
-        
+
         # Mode 2: Load from data file
         if data_path:
             success = self.run_all_pulls(data_path=data_path)
@@ -477,6 +310,6 @@ class GachaAutomation:
         else:
             logger.error("✗ Either 'config' or 'data_path' must be provided")
             return False
-        
+
         logger.info("="*60 + f"\n{'✓ COMPLETED' if success else '✗ FAILED'}\n" + "="*60)
         return success

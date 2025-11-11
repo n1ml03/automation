@@ -4,7 +4,6 @@ Festival Tab for GUI
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import json
 import os
 from typing import Dict, Any
 
@@ -72,9 +71,9 @@ class FestivalTab(BaseAutomationTab):
             return
 
         # Load data to get count for progress tracking
-        from core import data as data_module
+        from core.data import load_data
         try:
-            data_list = data_module.load_data(file_path)
+            data_list = load_data(file_path)
             if not data_list:
                 messagebox.showerror("Error", "No data in file!")
                 return

@@ -3,8 +3,7 @@ Gacha Tab for GUI
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-import json
+from tkinter import ttk, messagebox
 import os
 from typing import Dict, Any
 
