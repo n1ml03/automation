@@ -190,9 +190,9 @@ DEFAULT_PATHS: Dict[str, str] = {
 
 FESTIVAL_CONFIG: Dict[str, Any] = {
     # Paths
-    'templates_path': './templates',
-    'snapshot_dir': './result/festival/snapshots',
-    'results_dir': './result/festival/results',
+    'templates_path': DEFAULT_PATHS['templates'],
+    'snapshot_dir': f"{DEFAULT_PATHS['results']}/festival/snapshots",
+    'results_dir': f"{DEFAULT_PATHS['results']}/festival/results",
     
     # Timing
     'wait_after_touch': 1.0,
@@ -210,7 +210,7 @@ FESTIVAL_CONFIG: Dict[str, Any] = {
     
     # Template matching config
     'template_config': {
-        'templates_dir': './templates',
+        'templates_dir': DEFAULT_PATHS['templates'],
         'threshold': 0.85,
         'method': 'TM_CCOEFF_NORMED'
     },
@@ -232,9 +232,9 @@ FESTIVAL_CONFIG: Dict[str, Any] = {
 
 GACHA_CONFIG: Dict[str, Any] = {
     # Paths
-    'templates_path': './templates',
-    'snapshot_dir': './result/gacha/snapshots',
-    'results_dir': './result/gacha/results',
+    'templates_path': DEFAULT_PATHS['templates'],
+    'snapshot_dir': f"{DEFAULT_PATHS['results']}/gacha/snapshots",
+    'results_dir': f"{DEFAULT_PATHS['results']}/gacha/results",
     
     # Timing
     'wait_after_touch': 1.0,
@@ -255,9 +255,9 @@ GACHA_CONFIG: Dict[str, Any] = {
 
 HOPPING_CONFIG: Dict[str, Any] = {
     # Paths
-    'templates_path': './templates',
-    'snapshot_dir': './result/hopping/snapshots',
-    'results_dir': './result/hopping/results',
+    'templates_path': DEFAULT_PATHS['templates'],
+    'snapshot_dir': f"{DEFAULT_PATHS['results']}/hopping/snapshots",
+    'results_dir': f"{DEFAULT_PATHS['results']}/hopping/results",
     
     # Timing
     'wait_after_touch': 1.0,
@@ -290,7 +290,7 @@ DETECTOR_CONFIG: Dict[str, Any] = {
     
     # Template Matching settings
     'template': {
-        'templates_dir': './templates',
+        'templates_dir': DEFAULT_PATHS['templates'],
         'threshold': 0.85,  # Matching threshold (0.0-1.0)
         'method': 'TM_CCOEFF_NORMED',  # Matching method
         'min_distance': 10,  # Minimum distance to remove duplicates
