@@ -14,7 +14,7 @@ class QuickActionsPanel(ttk.Frame):
         super().__init__(parent, relief='solid', borderwidth=1)
         self.callbacks = callbacks
 
-        ttk.Label(self, text=" Quick Actions",
+        ttk.Label(self, text="Quick Actions",
                  font=('', 11, 'bold')).pack(pady=5)
 
         # Buttons grid
@@ -24,14 +24,14 @@ class QuickActionsPanel(ttk.Frame):
         # Row 1
         ttk.Button(
             btn_frame,
-            text="📱 Check Device",
+            text="Check Device",
             command=lambda: self._call('check_device'),
             width=18
         ).grid(row=0, column=0, sticky='ew', padx=3, pady=3, ipady=8)
 
         ttk.Button(
             btn_frame,
-            text="📸 Screenshot",
+            text="Screenshot",
             command=lambda: self._call('screenshot'),
             width=18
         ).grid(row=0, column=1, sticky='ew', padx=3, pady=3, ipady=8)
@@ -39,14 +39,14 @@ class QuickActionsPanel(ttk.Frame):
         # Row 2
         ttk.Button(
             btn_frame,
-            text="🔍 OCR Test",
+            text="OCR Test",
             command=lambda: self._call('ocr_test'),
             width=18
         ).grid(row=1, column=0, sticky='ew', padx=3, pady=3, ipady=8)
 
         ttk.Button(
             btn_frame,
-            text="📂 Open Results",
+            text="Open Results",
             command=lambda: self._call('open_output'),
             width=18
         ).grid(row=1, column=1, sticky='ew', padx=3, pady=3, ipady=8)
@@ -54,14 +54,14 @@ class QuickActionsPanel(ttk.Frame):
         # Row 3
         ttk.Button(
             btn_frame,
-            text="📋 Copy Logs",
+            text="Copy Logs",
             command=lambda: self._call('copy_logs'),
             width=18
         ).grid(row=2, column=0, sticky='ew', padx=3, pady=3, ipady=8)
 
         ttk.Button(
             btn_frame,
-            text=" Clear Cache",
+            text="Clear Cache",
             command=lambda: self._call('clear_cache'),
             width=18
         ).grid(row=2, column=1, sticky='ew', padx=3, pady=3, ipady=8)

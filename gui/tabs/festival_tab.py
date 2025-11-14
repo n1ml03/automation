@@ -28,7 +28,7 @@ class FestivalTab(BaseAutomationTab):
     def _create_config_ui(self, parent):
         """Create Festival-specific configuration UI."""
         # Output Configuration
-        output_section = ttk.LabelFrame(parent, text="💾 Output", padding=10)
+        output_section = ttk.LabelFrame(parent, text="Output", padding=10)
         output_section.pack(fill='x', pady=5)
 
         output_inner = ttk.Frame(output_section)
@@ -37,8 +37,8 @@ class FestivalTab(BaseAutomationTab):
         # Output file (optional)
         ttk.Label(output_inner, text="Output File:", font=('', 10)).grid(row=0, column=0, sticky='w', pady=2)
         ttk.Entry(output_inner, textvariable=self.output_file_var, width=30, font=('', 10)).grid(row=0, column=1, sticky='ew', padx=5, pady=2)
-        ttk.Button(output_inner, text="📂", command=self.browse_output, width=8).grid(row=0, column=2, pady=2, ipady=5)
-        ttk.Label(output_inner, text="(Optional - auto-generated if empty)", font=('', 8), foreground='gray').grid(row=1, column=0, columnspan=3, sticky='w')
+        ttk.Button(output_inner, text="Browse", command=self.browse_output, width=8).grid(row=0, column=2, pady=2, ipady=5)
+        ttk.Label(output_inner, text="(Optional - auto-generated if empty)", font=('', 8), foreground='#6b7280').grid(row=1, column=0, columnspan=3, sticky='w')
 
         output_inner.columnconfigure(1, weight=1)
 
@@ -96,8 +96,8 @@ class FestivalTab(BaseAutomationTab):
                 logger.info("Festival automation cancelled before start")
                 return False
             
-            # Initialize FestivalAutomation
-            self.automation_instance = self.automation_class(self.agent, config)
+            # Initialize FestivalAutomation with cancellation event
+            self.automation_instance = self.automation_class(self.agent, config, cancel_event=self.thread_cancel_event)
             
             # Verify instance was created
             if self.automation_instance is None:

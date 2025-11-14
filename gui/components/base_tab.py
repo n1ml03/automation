@@ -93,7 +93,7 @@ class BaseAutomationTab(ttk.Frame):
 
     def _setup_file_section(self, parent):
         """Setup file selection section."""
-        file_section = ttk.LabelFrame(parent, text="📁 Data File", padding=10)
+        file_section = ttk.LabelFrame(parent, text="Data File", padding=10)
         file_section.pack(fill='x', pady=5)
 
         file_inner = ttk.Frame(file_section)
@@ -102,16 +102,16 @@ class BaseAutomationTab(ttk.Frame):
         ttk.Label(file_inner, text=f"{self.tab_name} Data:", font=('', 10)).grid(row=0, column=0, sticky='w', pady=2)
         ttk.Entry(file_inner, textvariable=self.file_path_var, width=40, font=('', 10)).grid(row=0, column=1, padx=5, pady=2, sticky='ew')
         ttk.Button(file_inner, text="Browse", command=self.browse_file, width=12).grid(row=0, column=2, pady=2, ipady=5)
-        ttk.Button(file_inner, text="👁 Preview", command=self.preview_data, width=12).grid(row=0, column=3, padx=2, pady=2, ipady=5)
+        ttk.Button(file_inner, text="Preview", command=self.preview_data, width=12).grid(row=0, column=3, padx=2, pady=2, ipady=5)
 
         ttk.Label(file_inner, text="", font=('', 8)).grid(row=1, column=0, columnspan=4, sticky='w', pady=(2, 0))
-        ttk.Label(file_inner, text=f"💡 Select {self.tab_name.lower()}.json or CSV file containing {self.tab_name.lower()} data", font=('', 9), foreground='gray').grid(row=2, column=0, columnspan=4, sticky='w')
+        ttk.Label(file_inner, text=f"Select {self.tab_name.lower()}.json or CSV file containing {self.tab_name.lower()} data", font=('', 9), foreground='#6b7280').grid(row=2, column=0, columnspan=4, sticky='w')
 
         file_inner.columnconfigure(1, weight=1)
 
     def _setup_common_settings(self, parent):
         """Setup common automation settings."""
-        config_section = ttk.LabelFrame(parent, text=" Automation Settings", padding=10)
+        config_section = ttk.LabelFrame(parent, text="Automation Settings", padding=10)
         config_section.pack(fill='x', pady=5)
 
         config_inner = ttk.Frame(config_section)
@@ -120,17 +120,17 @@ class BaseAutomationTab(ttk.Frame):
         # Templates path
         ttk.Label(config_inner, text="Templates Folder:", font=('', 10)).grid(row=0, column=0, sticky='w', pady=2)
         ttk.Entry(config_inner, textvariable=self.templates_path_var, width=30, font=('', 10)).grid(row=0, column=1, sticky='ew', padx=5, pady=2)
-        ttk.Button(config_inner, text="📂", command=self.browse_templates, width=8).grid(row=0, column=2, pady=2, ipady=5)
+        ttk.Button(config_inner, text="Browse", command=self.browse_templates, width=8).grid(row=0, column=2, pady=2, ipady=5)
 
         # Snapshot directory
         ttk.Label(config_inner, text="Snapshots Folder:", font=('', 10)).grid(row=1, column=0, sticky='w', pady=2)
         ttk.Entry(config_inner, textvariable=self.snapshot_dir_var, width=30, font=('', 10)).grid(row=1, column=1, sticky='ew', padx=5, pady=2)
-        ttk.Button(config_inner, text="📂", command=self.browse_snapshot_dir, width=8).grid(row=1, column=2, pady=2, ipady=5)
+        ttk.Button(config_inner, text="Browse", command=self.browse_snapshot_dir, width=8).grid(row=1, column=2, pady=2, ipady=5)
 
         # Results directory
         ttk.Label(config_inner, text="Results Folder:", font=('', 10)).grid(row=2, column=0, sticky='w', pady=2)
         ttk.Entry(config_inner, textvariable=self.results_dir_var, width=30, font=('', 10)).grid(row=2, column=1, sticky='ew', padx=5, pady=2)
-        ttk.Button(config_inner, text="📂", command=self.browse_results_dir, width=8).grid(row=2, column=2, pady=2, ipady=5)
+        ttk.Button(config_inner, text="Browse", command=self.browse_results_dir, width=8).grid(row=2, column=2, pady=2, ipady=5)
 
         # Wait time
         ttk.Label(config_inner, text="Wait After Touch:", font=('', 10)).grid(row=3, column=0, sticky='w', pady=2)
@@ -148,7 +148,7 @@ class BaseAutomationTab(ttk.Frame):
 
         self.start_button = ttk.Button(
             action_frame,
-            text=f" Start {self.tab_name}",
+            text=f"Start {self.tab_name}",
             command=self.start_automation,
             style='Accent.TButton',
             width=20
@@ -157,7 +157,7 @@ class BaseAutomationTab(ttk.Frame):
 
         self.stop_button = ttk.Button(
             action_frame,
-            text="⏹ Stop",
+            text="Stop",
             command=self.stop_automation,
             state='disabled',
             width=12
@@ -168,14 +168,14 @@ class BaseAutomationTab(ttk.Frame):
 
         ttk.Button(
             action_frame,
-            text="💾 Save Config",
+            text="Save Config",
             command=self.save_config,
             width=15
         ).pack(side='left', padx=5, ipady=8)
 
         ttk.Button(
             action_frame,
-            text="📂 Load Config",
+            text="Load Config",
             command=self.load_config,
             width=15
         ).pack(side='left', padx=5, ipady=8)
@@ -200,7 +200,7 @@ class BaseAutomationTab(ttk.Frame):
         self.quick_actions.pack(fill='x', pady=5)
 
         # Status box
-        status_frame = ttk.LabelFrame(parent, text="📡 Status", padding=10)
+        status_frame = ttk.LabelFrame(parent, text="Status", padding=10)
         status_frame.pack(fill='x', pady=5)
 
         status_label = ttk.Label(
@@ -276,7 +276,7 @@ class BaseAutomationTab(ttk.Frame):
 
             # Create preview window
             preview_window = tk.Toplevel(self)
-            preview_window.title(f"📊 Data Preview: {os.path.basename(file_path)}")
+            preview_window.title(f"Data Preview: {os.path.basename(file_path)}")
             preview_window.geometry("1200x700")
             preview_window.minsize(800, 500)
             
@@ -300,7 +300,7 @@ class BaseAutomationTab(ttk.Frame):
             info_container = ttk.Frame(toolbar)
             info_container.pack(side='left', fill='x', expand=True, padx=10, pady=8)
             
-            ttk.Label(info_container, text=f"📄 {os.path.basename(file_path)}", 
+            ttk.Label(info_container, text=f"{os.path.basename(file_path)}", 
                      font=('Segoe UI', 10, 'bold')).pack(side='left')
             ttk.Label(info_container, text=f"  •  {len(data_list):,} rows", 
                      font=('', 9), foreground='#2563eb').pack(side='left', padx=8)
@@ -308,19 +308,19 @@ class BaseAutomationTab(ttk.Frame):
                      font=('', 9), foreground='#059669').pack(side='left')
             
             if is_large_dataset:
-                ttk.Label(info_container, text=f"  ⚡ Showing first {MAX_DISPLAY_ROWS:,} rows", 
+                ttk.Label(info_container, text=f"  Showing first {MAX_DISPLAY_ROWS:,} rows", 
                          font=('', 9), foreground='#dc2626').pack(side='left', padx=8)
             
             # Search section
             search_container = ttk.Frame(toolbar)
             search_container.pack(side='right', padx=10, pady=5)
             
-            ttk.Label(search_container, text="🔍", font=('', 11)).pack(side='left', padx=(0, 5))
+            ttk.Label(search_container, text="Search:", font=('', 10)).pack(side='left', padx=(0, 5))
             search_var = tk.StringVar()
             search_entry = ttk.Entry(search_container, textvariable=search_var, width=30, font=('', 9))
             search_entry.pack(side='left', padx=2)
             
-            clear_search_btn = ttk.Button(search_container, text="✕", width=3, 
+            clear_search_btn = ttk.Button(search_container, text="Clear", width=6, 
                                          command=lambda: search_var.set(""))
             clear_search_btn.pack(side='left', padx=2)
             
@@ -329,7 +329,7 @@ class BaseAutomationTab(ttk.Frame):
             main_container.pack(fill='both', expand=True, padx=5, pady=5)
             
             # Left panel - Column visibility
-            left_panel = ttk.LabelFrame(main_container, text="📊 Columns", width=200)
+            left_panel = ttk.LabelFrame(main_container, text="Columns", width=200)
             left_panel.pack(side='left', fill='y', padx=(0, 5))
             left_panel.pack_propagate(False)
             
@@ -337,9 +337,9 @@ class BaseAutomationTab(ttk.Frame):
             col_control_frame = ttk.Frame(left_panel)
             col_control_frame.pack(fill='x', padx=5, pady=5)
             
-            ttk.Button(col_control_frame, text="✓ All", width=8,
+            ttk.Button(col_control_frame, text="All", width=8,
                       command=lambda: toggle_all_columns(True)).pack(side='left', padx=2)
-            ttk.Button(col_control_frame, text="✗ None", width=8,
+            ttk.Button(col_control_frame, text="None", width=8,
                       command=lambda: toggle_all_columns(False)).pack(side='left', padx=2)
             
             # Scrollable column list
@@ -366,7 +366,7 @@ class BaseAutomationTab(ttk.Frame):
             col_canvas.bind('<Configure>', lambda e: col_canvas.itemconfig(col_canvas_window, width=e.width))
             
             # Statistics panel
-            stats_frame = ttk.LabelFrame(left_panel, text="📈 Statistics")
+            stats_frame = ttk.LabelFrame(left_panel, text="Statistics")
             stats_frame.pack(fill='x', padx=5, pady=5, side='bottom')
             
             stats_text = tk.Text(stats_frame, height=8, width=25, font=('Courier', 8), wrap=tk.WORD)
@@ -433,7 +433,7 @@ class BaseAutomationTab(ttk.Frame):
                 max_width = max(max_width, 80)
                 
                 tree.column(col, width=max_width, minwidth=60, anchor='w', stretch=True)
-                tree.heading(col, text=f"▼ {col}", anchor='w')
+                tree.heading(col, text=col, anchor='w')
             
             # Performance optimized data loading
             original_data = []
@@ -491,14 +491,14 @@ class BaseAutomationTab(ttk.Frame):
                     tree.move(item, '', index)
                 
                 # Update heading with sort indicator
-                indicator = "▲" if reverse else "▼"
-                tree.heading(col, text=f"{indicator} {col}", 
+                indicator = " ^" if reverse else " v"
+                tree.heading(col, text=f"{col}{indicator}", 
                            command=lambda: sort_column(col, not reverse))
                 
                 # Clear other column indicators
                 for other_col in all_columns:
                     if other_col != col:
-                        tree.heading(other_col, text=f"▼ {other_col}")
+                        tree.heading(other_col, text=other_col)
                 
                 sort_state[col] = reverse
             
@@ -520,12 +520,12 @@ class BaseAutomationTab(ttk.Frame):
             
             # Context menu (right-click)
             context_menu = tk.Menu(preview_window, tearoff=0)
-            context_menu.add_command(label="📋 Copy Cell", command=lambda: copy_selected_cell())
-            context_menu.add_command(label="📋 Copy Row", command=lambda: copy_selected_row())
+            context_menu.add_command(label="Copy Cell", command=lambda: copy_selected_cell())
+            context_menu.add_command(label="Copy Row", command=lambda: copy_selected_row())
             context_menu.add_separator()
-            context_menu.add_command(label="🔍 Filter by Value", command=lambda: filter_by_value())
+            context_menu.add_command(label="Filter by Value", command=lambda: filter_by_value())
             context_menu.add_separator()
-            context_menu.add_command(label="✓ Select All", command=lambda: tree.selection_set(tree.get_children()))
+            context_menu.add_command(label="Select All", command=lambda: tree.selection_set(tree.get_children()))
             
             def show_context_menu(event):
                 try:
@@ -578,7 +578,7 @@ class BaseAutomationTab(ttk.Frame):
                     preview_window.clipboard_clear()
                     preview_window.clipboard_append(str(value))
                     # Visual feedback
-                    status_label.config(text=f"✓ Copied: {str(value)[:50]}...", foreground='#059669')
+                    status_label.config(text=f"Copied: {str(value)[:50]}...", foreground='#059669')
                     preview_window.after(2000, lambda: status_label.config(text="Ready", foreground='#64748b'))
             
             tree.bind('<Double-Button-1>', copy_cell_double_click)
@@ -615,23 +615,23 @@ class BaseAutomationTab(ttk.Frame):
             status_label = ttk.Label(status_bar, text="Ready", font=('', 9), foreground='#64748b')
             status_label.pack(side='left', padx=10, pady=3)
             
-            ttk.Label(status_bar, text="💡 Ctrl+F: Search  •  Ctrl+C: Copy  •  Right-click: Menu  •  ESC: Close", 
+            ttk.Label(status_bar, text="Ctrl+F: Search  •  Ctrl+C: Copy  •  Right-click: Menu  •  ESC: Close", 
                      font=('', 8), foreground='#94a3b8').pack(side='right', padx=10)
             
             # ===== BOTTOM BUTTONS =====
             button_frame = ttk.Frame(preview_window)
             button_frame.pack(fill='x', padx=10, pady=8)
             
-            ttk.Button(button_frame, text="📋 Copy All", 
+            ttk.Button(button_frame, text="Copy All", 
                       command=lambda: self._copy_table_data(tree, all_columns), 
                       width=14).pack(side='left', padx=3)
-            ttk.Button(button_frame, text="💾 Export CSV", 
+            ttk.Button(button_frame, text="Export CSV", 
                       command=lambda: self._export_table_data(data_list, all_columns), 
                       width=14).pack(side='left', padx=3)
-            ttk.Button(button_frame, text="📊 Column Stats", 
+            ttk.Button(button_frame, text="Column Stats", 
                       command=lambda: self._show_column_stats(data_list, all_columns), 
                       width=14).pack(side='left', padx=3)
-            ttk.Button(button_frame, text="🔄 Refresh", 
+            ttk.Button(button_frame, text="Refresh", 
                       command=lambda: messagebox.showinfo("Refresh", "Data refreshed!"), 
                       width=12).pack(side='left', padx=3)
             
@@ -697,13 +697,13 @@ class BaseAutomationTab(ttk.Frame):
             from tkinter import scrolledtext
             
             stats_window = tk.Toplevel(self)
-            stats_window.title("📊 Column Statistics")
+            stats_window.title("Column Statistics")
             stats_window.geometry("700x600")
             
             # Header
             header = ttk.Frame(stats_window)
             header.pack(fill='x', padx=10, pady=10)
-            ttk.Label(header, text="📊 Data Column Statistics", font=('', 12, 'bold')).pack(side='left')
+            ttk.Label(header, text="Data Column Statistics", font=('', 12, 'bold')).pack(side='left')
             ttk.Label(header, text=f"{len(data_list)} rows  •  {len(columns)} columns", 
                      font=('', 10)).pack(side='right')
             
@@ -843,8 +843,8 @@ class BaseAutomationTab(ttk.Frame):
                 logger.info(f"{self.tab_name} automation cancelled before start")
                 return False
             
-            # Initialize automation instance
-            self.automation_instance = self.automation_class(self.agent, config)
+            # Initialize automation instance with cancellation event
+            self.automation_instance = self.automation_class(self.agent, config, cancel_event=self.thread_cancel_event)
             
             # Verify instance was created
             if self.automation_instance is None:
@@ -871,10 +871,10 @@ class BaseAutomationTab(ttk.Frame):
         self._cleanup_automation()
         
         if success:
-            self.status_var.set(f"✅ Completed!")
+            self.status_var.set("Completed!")
             messagebox.showinfo("Success", f"{self.tab_name} completed!")
         else:
-            self.status_var.set(f"❌ Failed")
+            self.status_var.set("Failed")
             msg = f"{self.tab_name} failed!"
             if error_msg:
                 msg += f"\n\n{error_msg}"
@@ -886,7 +886,7 @@ class BaseAutomationTab(ttk.Frame):
         self.start_button.config(state='disabled' if running else 'normal')
         self.stop_button.config(state='normal' if running else 'disabled')
         if running:
-            self.status_var.set(f"🔄 Running...")
+            self.status_var.set("Running...")
 
     def stop_automation(self):
         """Stop running automation."""
@@ -894,14 +894,14 @@ class BaseAutomationTab(ttk.Frame):
             return
         
         self.thread_cancel_event.set()
-        self.status_var.set("⏹ Stopping...")
+        self.status_var.set("Stopping...")
         
         if self.thread_manager.cancel_task(self.task_id, timeout=3.0):
             self._set_running_state(False)
-            self.status_var.set("⏹ Stopped")
+            self.status_var.set("Stopped")
             logger.info(f"{self.tab_name} stopped by user")
         else:
-            self.status_var.set("⏹ Stopping (please wait...)")
+            self.status_var.set("Stopping (please wait...)")
         
         self._cleanup_automation()
     
@@ -912,11 +912,11 @@ class BaseAutomationTab(ttk.Frame):
     def quick_check_device(self):
         """Check device connection status."""
         if self.agent.is_device_connected():
-            messagebox.showinfo("Device Status", "✓ Device is connected!")
-            self.status_var.set("✓ Device connected")
+            messagebox.showinfo("Device Status", "Device is connected!")
+            self.status_var.set("Device connected")
         else:
-            messagebox.showwarning("Device Status", "✗ Device not connected!")
-            self.status_var.set("✗ Device not connected")
+            messagebox.showwarning("Device Status", "Device not connected!")
+            self.status_var.set("Device not connected")
 
     def quick_screenshot(self):
         """Take a quick screenshot."""

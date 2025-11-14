@@ -216,8 +216,11 @@ FESTIVAL_CONFIG: Dict[str, Any] = {
     },
     
     # ROI groups
+    'festivals_rois': [
+        'フェス名', 'フェスランク'
+    ],
     'pre_battle_rois': [
-        'フェス名', 'フェスランク', '勝利点数', '推奨ランク',
+        '勝利点数', '推奨ランク',
         'Sランクボーダー', '初回クリア報酬', 'Sランク報酬'
     ],
     'post_battle_rois': [

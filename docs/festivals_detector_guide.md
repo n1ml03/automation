@@ -75,66 +75,87 @@ festival.run('festivals.json', use_detector=True)
 
 ## API Methods mới
 
-### 1. `detect_and_ocr_roi()`
-Detect object trong ROI và OCR để lấy text/quantity.
+### 1. `detect_roi()`
+Detect objects trong ROI (chỉ detection, không OCR).
 
 ```python
-result = festival.detect_and_ocr_roi('獲得アイテム', screenshot)
+result = festival.detect_roi('獲得アイテム', screenshot)
 
 # Result format:
 {
     'roi_name': '獲得アイテム',
-    'text': 'Item Name x100',          # Text từ OCR
     'detected': True,                   # Có detect được không
     'detections': [                     # Danh sách objects detected
         {
             'item': 'item_name',
-            'quantity': 100,
+            'quantity': 100,            # YOLO tự trích xuất quantity
             'x': 100, 'y': 200,
-            'confidence': 0.95
+            'confidence': 0.95,
+            'ocr_text': 'x100'         # Text từ OCR bên trong detector
         }
     ],
-    'detection_count': 1,              # Số objects detected
-    'has_quantity': True,              # Có quantity không
-    'quantity': 100                    # Quantity value
+    'detection_count': 1               # Số objects detected
 }
 ```
 
-### 2. `scan_screen_roi_with_detector()`
-Scan nhiều ROIs với detector (version nâng cao của `scan_screen_roi`).
+### 2. `scan_rois_detector()`
+Scan nhiều ROIs chỉ với detector (không OCR).
 
 ```python
-results = festival.scan_screen_roi_with_detector(
+results = festival.scan_rois_detector(
     screenshot=screenshot,
-    roi_names=['獲得アイテム', '獲得ザックマネー'],
-    use_detector=True
+    roi_names=['獲得アイテム', '獲得ザックマネー']
 )
 
 # Results format:
 {
     '獲得アイテム': {
-        'text': 'Item x100',
         'detected': True,
-        'detection_count': 1,
-        'quantity': 100
+        'detections': [...],
+        'detection_count': 1
     },
     '獲得ザックマネー': {
-        'text': '5000',
         'detected': True,
-        'detection_count': 1,
-        'quantity': 5000
+        'detections': [...],
+        'detection_count': 1
     }
 }
 ```
 
-### 3. `compare_results()`
+### 3. `scan_rois_combined()`
+Scan nhiều ROIs với cả OCR và detector (comprehensive mode).
+
+```python
+results = festival.scan_rois_combined(
+    screenshot=screenshot,
+    roi_names=['獲得アイテム', '獲得ザックマネー']
+)
+
+# Results format:
+{
+    '獲得アイテム': {
+        'text': 'Item x100',           # Từ OCR
+        'detected': True,              # Từ detector
+        'detections': [...],
+        'detection_count': 1
+    },
+    '獲得ザックマネー': {
+        'text': '5000',
+        'detected': True,
+        'detections': [...],
+        'detection_count': 1
+    }
+}
+```
+
+### 4. `compare_results()`
 So sánh dữ liệu OCR/Detector với expected data từ CSV.
 Hỗ trợ cả simple OCR format và detector format.
 
 ```python
 # Với detector (trả về details)
 is_ok, message, details = festival.compare_results(
-    extracted_data=results,  # Từ scan_screen_roi_with_detector() hoặc scan_screen_roi()
+    extracted_data=results,  # Từ scan_rois_combined() hoặc scan_screen_roi()
     expected_data=csv_data,
     return_details=True  # Default
 )
@@ -154,7 +175,7 @@ is_ok, message, _ = festival.compare_results(
         'expected': 'Item x100',
         'detected': True,
         'detection_count': 1,
-        'quantity': 100
+        'quantity': 100                 # Từ detections list
     }
 }
 ```
@@ -166,30 +187,27 @@ is_ok, message, _ = festival.compare_results(
 ### Pre-battle Check (Step 6)
 ```
 1. Snapshot màn hình
-2. Scan ROIs với detector:
-   - ['フェス名', 'フェスランク', '勝利点数', '推奨ランク',
-      'Sランクボーダー', '初回クリア報酬', 'Sランク報酬']
+2. Scan ROIs với scan_rois_combined():
+   - ['勝利点数', '推奨ランク', 'Sランクボーダー', '初回クリア報酬', 'Sランク報酬']
 3. Mỗi ROI:
-   a. Crop vùng ROI
-   b. YOLO/Template detect objects
-   c. OCR để đọc text
-   d. Trích xuất quantity nếu có
-4. Compare với CSV (enhanced mode)
-5. Log results với detection info
+   a. OCR để đọc text
+   b. Detect objects (nếu có detector)
+   c. Kết hợp cả 2 results
+4. Compare với CSV (comprehensive verification)
+5. Log results
 ```
 
 ### Post-battle Check (Step 13)
 ```
 1. Snapshot kết quả
-2. Scan ROIs với detector:
+2. Scan ROIs với scan_rois_combined():
    - ['獲得ザックマネー', '獲得アイテム',
       '獲得EXP-Ace', '獲得EXP-NonAce', 'エース', '非エース']
 3. Mỗi ROI:
-   a. Crop vùng ROI
-   b. YOLO/Template detect objects (items, rewards)
-   c. OCR để đọc text + quantity
-   d. Extract quantity từ detector
-4. Compare với CSV (enhanced mode)
+   a. OCR để đọc text
+   b. YOLO/Template detect objects (items, rewards) với quantity
+   c. Kết hợp results (text + detections)
+4. Compare với CSV (comprehensive verification)
 5. Log results với detection info + quantity
 ```
 
@@ -197,19 +215,27 @@ is_ok, message, _ = festival.compare_results(
 
 ## Log Output Examples
 
-### Với Detector:
+### Với Detector (scan_rois_combined):
 ```
-✓ ROI '獲得アイテム': text='Memory Fragment x100', detected=True (2 objects), quantity=100
+✓ ROI '獲得アイテム': detected=True (2 objects)
 ROI '獲得アイテム' detected 2 objects:
   - memory_fragment x100 (conf: 0.95)
   - bonus_item x5 (conf: 0.87)
-Pre-battle check (with detector): ✓ 7/7 matched
+Scanned 6 ROIs (combined OCR + detector)
+Pre-battle check (with detector): ✓ 5/5 matched
 ```
 
-### Không Detector:
+### Detector only (scan_rois_detector):
+```
+✓ ROI '獲得アイテム': detected=True (2 objects)
+Scanned 6 ROIs with detector
+```
+
+### Không Detector (OCR only):
 ```
 ✓ 獲得アイテム: 'Memory Fragment x100'
-Pre-battle check: ✓ 7/7 matched
+Scanned 5 ROIs
+Pre-battle check: ✓ 5/5 matched
 ```
 
 ---
@@ -267,29 +293,56 @@ config = {
 
 ---
 
-## Example: Hybrid Mode
+## Example: Sử dụng các modes khác nhau
 
-Bạn có thể mix & match: OCR cho pre-battle, Detector cho post-battle.
-
+### Mode 1: Detector only (nhanh nhất khi chỉ cần detect)
 ```python
-# Trong run_festival_stage, tùy chỉnh:
-if use_detector and self.detector is not None:
-    # Pre-battle: chỉ OCR (nhanh)
-    extracted_before = self.scan_screen_roi(screenshot_after, pre_battle_rois)
-    
-    # Post-battle: detector + OCR (chính xác hơn cho items)
-    extracted_after = self.scan_screen_roi_with_detector(screenshot_result, post_battle_rois)
+# Chỉ detect objects, không OCR text
+results = festival.scan_rois_detector(
+    screenshot=screenshot,
+    roi_names=['獲得アイテム', '獲得ザックマネー']
+)
+```
+
+### Mode 2: Combined mode (comprehensive)
+```python
+# Cả OCR và detection để verify toàn diện
+results = festival.scan_rois_combined(
+    screenshot=screenshot,
+    roi_names=['獲得アイテム', '獲得ザックマネー']
+)
+```
+
+### Mode 3: OCR only (legacy)
+```python
+# Chỉ OCR, không detection
+results = festival.scan_screen_roi(
+    screenshot=screenshot,
+    roi_names=['獲得アイテム', '獲得ザックマネー']
+)
 ```
 
 ---
 
 ## Kết luận
 
-Detector + OCR mang lại:
--  **Độ chính xác cao hơn** nhờ double verification
--  **Quantity extraction** tự động từ detector
--  **Flexible** với 3 chế độ: YOLO, Template, Auto
--  **Backward compatible** với OCR-only mode
+### Cấu trúc mới (Refactored)
 
-Khuyến nghị: Sử dụng **Auto mode** để có trải nghiệm tốt nhất!
+**Separation of Concerns:**
+- `detect_roi()`: Chỉ detection (focused)
+- `scan_rois_detector()`: Scan nhiều ROIs với detector (detector-only)
+- `scan_rois_combined()`: Scan với cả OCR và detector (comprehensive)
+- `ocr_roi()` (from base.py): Chỉ OCR (legacy)
+
+**Lợi ích:**
+- ✅ **Tập trung**: Mỗi function có 1 mục đích rõ ràng
+- ✅ **Hiệu quả**: Không crop ROI nhiều lần, không OCR không cần thiết
+- ✅ **Linh hoạt**: Chọn mode phù hợp (detector-only, combined, OCR-only)
+- ✅ **Dễ maintain**: Code sạch hơn, ít duplicate
+- ✅ **Performance**: YOLO detector đã có OCR riêng, không cần chạy OCR thêm
+
+Khuyến nghị: 
+- Sử dụng **`scan_rois_combined()`** cho verification toàn diện (Step 6, 13)
+- Sử dụng **`scan_rois_detector()`** khi chỉ cần detect items
+- Sử dụng **Auto mode** detector type để có trải nghiệm tốt nhất!
 

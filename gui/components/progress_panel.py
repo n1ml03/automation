@@ -14,7 +14,7 @@ class ProgressPanel(ttk.Frame):
         super().__init__(parent, relief='solid', borderwidth=1)
 
         # Title
-        ttk.Label(self, text="📊 Progress & Statistics",
+        ttk.Label(self, text="Progress & Statistics",
                  font=('', 11, 'bold')).pack(pady=5)
 
         # Progress bar
@@ -41,22 +41,22 @@ class ProgressPanel(ttk.Frame):
         self.total_label.grid(row=0, column=1, sticky='w', padx=5)
 
         # Success
-        ttk.Label(stats_frame, text=" OK:", font=('', 9)).grid(row=0, column=2, sticky='w', padx=(20, 0))
-        self.ok_label = ttk.Label(stats_frame, text="0", font=('', 9, 'bold'), foreground='green')
+        ttk.Label(stats_frame, text="OK:", font=('', 9)).grid(row=0, column=2, sticky='w', padx=(20, 0))
+        self.ok_label = ttk.Label(stats_frame, text="0", font=('', 9, 'bold'), foreground='#059669')
         self.ok_label.grid(row=0, column=3, sticky='w', padx=5)
 
         # Failed
-        ttk.Label(stats_frame, text=" NG:", font=('', 9)).grid(row=0, column=4, sticky='w', padx=(20, 0))
-        self.ng_label = ttk.Label(stats_frame, text="0", font=('', 9, 'bold'), foreground='red')
+        ttk.Label(stats_frame, text="NG:", font=('', 9)).grid(row=0, column=4, sticky='w', padx=(20, 0))
+        self.ng_label = ttk.Label(stats_frame, text="0", font=('', 9, 'bold'), foreground='#dc2626')
         self.ng_label.grid(row=0, column=5, sticky='w', padx=5)
 
         # Time elapsed
-        ttk.Label(stats_frame, text="⏱ Time:", font=('', 9)).grid(row=1, column=0, sticky='w', pady=(5, 0))
+        ttk.Label(stats_frame, text="Time:", font=('', 9)).grid(row=1, column=0, sticky='w', pady=(5, 0))
         self.time_label = ttk.Label(stats_frame, text="00:00:00", font=('', 9, 'bold'))
         self.time_label.grid(row=1, column=1, columnspan=2, sticky='w', padx=5, pady=(5, 0))
 
         # ETA
-        ttk.Label(stats_frame, text="⏳ ETA:", font=('', 9)).grid(row=1, column=2, sticky='w', padx=(20, 0), pady=(5, 0))
+        ttk.Label(stats_frame, text="ETA:", font=('', 9)).grid(row=1, column=2, sticky='w', padx=(20, 0), pady=(5, 0))
         self.eta_label = ttk.Label(stats_frame, text="--:--:--", font=('', 9, 'bold'))
         self.eta_label.grid(row=1, column=3, columnspan=3, sticky='w', padx=5, pady=(5, 0))
 

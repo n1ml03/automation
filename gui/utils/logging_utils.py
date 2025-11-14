@@ -87,7 +87,7 @@ class OptimizedLogViewer:
         log_header = ttk.Frame(log_container)
         log_header.pack(fill='x')
 
-        ttk.Label(log_header, text="📋 Activity Logs", font=('', 10, 'bold')).pack(side='left', padx=5)
+        ttk.Label(log_header, text="Activity Logs", font=('', 10, 'bold')).pack(side='left', padx=5)
 
         # Auto-scroll checkbox
         self.auto_scroll_var = tk.BooleanVar(value=True)
@@ -108,7 +108,7 @@ class OptimizedLogViewer:
 
         ttk.Button(
             log_header,
-            text="💾 Save",
+            text="Save",
             command=self.save_logs,
             width=10
         ).pack(side='right', padx=5, ipady=4)

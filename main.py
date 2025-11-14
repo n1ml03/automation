@@ -67,13 +67,84 @@ class AutoCPeachGUI(tk.Tk):
         logging.getLogger().addHandler(queue_handler)
 
     def setup_styles(self):
-        """Configure UI styling."""
+        """Configure UI styling bright theme."""
         style = ttk.Style()
-        style.theme_use('alt')
-        style.configure('Accent.TButton', font=('', 11, 'bold'))
-        style.configure('TButton', font=('', 10))
-        style.configure('TLabel', font=('', 10))
-        style.configure('TEntry', font=('', 10))
+        style.theme_use('clam')  # Use clam theme for cleaner, brighter look
+        
+        # Define bright, modern color scheme
+        bg_color = '#ffffff'
+        fg_color = '#1f2937'
+        accent_color = '#3b82f6'
+        accent_hover = '#2563eb'
+        border_color = '#e5e7eb'
+        
+        # Configure accent button with bright blue
+        style.configure('Accent.TButton', 
+                       font=('Segoe UI', 11, 'bold'),
+                       background=accent_color,
+                       foreground='white',
+                       borderwidth=0,
+                       focuscolor='none')
+        style.map('Accent.TButton',
+                 background=[('active', accent_hover)])
+        
+        # Standard button styling
+        style.configure('TButton', 
+                       font=('Segoe UI', 10),
+                       background='#f3f4f6',
+                       foreground=fg_color,
+                       borderwidth=1,
+                       relief='flat')
+        style.map('TButton',
+                 background=[('active', '#e5e7eb')])
+        
+        # Label styling
+        style.configure('TLabel', 
+                       font=('Segoe UI', 10),
+                       background=bg_color,
+                       foreground=fg_color)
+        
+        # Entry styling
+        style.configure('TEntry', 
+                       font=('Segoe UI', 10),
+                       fieldbackground='white',
+                       borderwidth=1,
+                       relief='solid')
+        
+        # Frame styling
+        style.configure('TFrame', 
+                       background=bg_color,
+                       borderwidth=1)
+        
+        # LabelFrame styling
+        style.configure('TLabelframe', 
+                       background=bg_color,
+                       foreground=fg_color,
+                       borderwidth=1,
+                       relief='solid')
+        style.configure('TLabelframe.Label', 
+                       font=('Segoe UI', 10, 'bold'),
+                       background=bg_color,
+                       foreground=fg_color)
+        
+        # Notebook styling
+        style.configure('TNotebook', 
+                       background=bg_color,
+                       borderwidth=0)
+        style.configure('TNotebook.Tab', 
+                       font=('Segoe UI', 10),
+                       padding=[20, 10],
+                       background='#f3f4f6')
+        style.map('TNotebook.Tab',
+                 background=[('selected', bg_color)],
+                 foreground=[('selected', accent_color)])
+        
+        # Progressbar styling
+        style.configure('TProgressbar',
+                       background=accent_color,
+                       troughcolor='#e5e7eb',
+                       borderwidth=0,
+                       thickness=20)
 
     def setup_ui(self):
         """Create main user interface."""

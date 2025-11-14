@@ -31,7 +31,7 @@ class GachaTab(BaseAutomationTab):
     def _create_config_ui(self, parent):
         """Create Gacha-specific configuration UI."""
         # Pull Configuration
-        config_section = ttk.LabelFrame(parent, text=" Gacha Settings", padding=10)
+        config_section = ttk.LabelFrame(parent, text="Gacha Settings", padding=10)
         config_section.pack(fill='x', pady=5)
 
         config_inner = ttk.Frame(config_section)
@@ -47,8 +47,8 @@ class GachaTab(BaseAutomationTab):
                                       values=["single", "multi"], state='readonly', width=8)
         pull_type_combo.grid(row=1, column=1, sticky='w', padx=5, pady=2)
 
-        ttk.Label(config_inner, text="💡 Single pull = 1 ticket, Multi pull = 10 tickets",
-                 font=('', 9), foreground='gray').grid(row=2, column=0, columnspan=2, sticky='w', pady=(5, 0))
+        ttk.Label(config_inner, text="Single pull = 1 ticket, Multi pull = 10 tickets",
+                 font=('', 9), foreground='#6b7280').grid(row=2, column=0, columnspan=2, sticky='w', pady=(5, 0))
 
     def _get_automation_config(self) -> Dict[str, Any]:
         """Get Gacha-specific automation config."""
@@ -65,7 +65,7 @@ class GachaTab(BaseAutomationTab):
         super()._setup_right_column(parent)
 
         # Add results summary panel
-        results_frame = ttk.LabelFrame(parent, text="📊 Results", padding=10)
+        results_frame = ttk.LabelFrame(parent, text="Results", padding=10)
         results_frame.pack(fill='x', pady=5)
 
         results_label = ttk.Label(
@@ -118,8 +118,8 @@ class GachaTab(BaseAutomationTab):
                 logger.info("Gacha automation cancelled before start")
                 return False
             
-            # Initialize GachaAutomation
-            self.automation_instance = self.automation_class(self.agent, config)
+            # Initialize GachaAutomation with cancellation event
+            self.automation_instance = self.automation_class(self.agent, config, cancel_event=self.thread_cancel_event)
             
             # Verify instance was created
             if self.automation_instance is None:

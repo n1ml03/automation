@@ -204,40 +204,10 @@ class ThreadManager:
 
 
 class BackgroundTaskRunner:
-    """High-level interface for running background tasks with UI callbacks."""
+    """Simplified high-level interface for running background tasks (kept for compatibility)."""
 
     def __init__(self, thread_manager: ThreadManager):
         self.thread_manager = thread_manager
-        self.ui_callbacks: Dict[str, Callable] = {}
-
-    def run_task(self, task_id: str, task_func: Callable, 
-                 on_complete: Optional[Callable] = None,
-                 on_error: Optional[Callable] = None,
-                 *args, **kwargs):
-        """Run a background task with completion callbacks."""
-
-        def wrapped_task():
-            try:
-                result = task_func(*args, **kwargs)
-                if on_complete:
-                    self._schedule_ui_callback(on_complete, result)
-                return result
-            except Exception as e:
-                logger.error(f"Background task {task_id} failed: {e}")
-                if on_error:
-                    self._schedule_ui_callback(on_error, e)
-                raise
-
-        return self.thread_manager.submit_task(task_id, wrapped_task)
-
-    def _schedule_ui_callback(self, callback: Callable, *args):
-        """Schedule a callback to run on the UI thread."""
-        # This would need to be called from the main thread context
-        # The callback should handle scheduling to UI thread
-        try:
-            callback(*args)
-        except Exception as e:
-            logger.error(f"UI callback failed: {e}")
 
     def cancel_task(self, task_id: str) -> bool:
         """Cancel a running task."""

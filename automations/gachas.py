@@ -17,13 +17,14 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 from airtest.core.api import sleep
 
-from core.base import BaseAutomation
+from core.base import BaseAutomation, CancellationError
 from core.agent import Agent
 from core.utils import get_logger
 from core.data import ResultWriter, load_data
 from core.config import (
     GACHA_ROI_CONFIG, get_gacha_config, merge_config
 )
+from core.detector import OCRTextProcessor
 
 logger = get_logger(__name__)
 
@@ -31,13 +32,13 @@ logger = get_logger(__name__)
 class GachaAutomation(BaseAutomation):
     """Automate Gacha pulls."""
 
-    def __init__(self, agent: Agent, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, agent: Agent, config: Optional[Dict[str, Any]] = None, cancel_event=None):
         # Merge config: base config from GACHA_CONFIG + custom config
         base_config = get_gacha_config()
         cfg = merge_config(base_config, config) if config else base_config
 
-        # Initialize base class with agent, config, and ROI config
-        super().__init__(agent, cfg, GACHA_ROI_CONFIG)
+        # Initialize base class with agent, config, ROI config, and cancellation event
+        super().__init__(agent, cfg, GACHA_ROI_CONFIG, cancel_event=cancel_event)
 
         # Gacha-specific timing
         self.wait_after_pull = cfg['wait_after_pull']
@@ -47,6 +48,140 @@ class GachaAutomation(BaseAutomation):
         self.pull_type = cfg['pull_type']
 
         logger.info("GachaAutomation initialized")
+
+    def process_gacha_result(self, scan_results: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Process gacha scan results with OCR text processing.
+        
+        Args:
+            scan_results: Raw OCR scan results from ROI
+            
+        Returns:
+            Dict with processed rarity, character, and confidence info
+        """
+        result = {
+            'rarity': 'Unknown',
+            'character': 'Unknown',
+            'rarity_confidence': 0.0,
+            'character_confidence': 0.0,
+            'raw_rarity': '',
+            'raw_character': ''
+        }
+        
+        try:
+            # Process rarity (normalize text)
+            raw_rarity = scan_results.get('rarity', '')
+            if raw_rarity:
+                result['raw_rarity'] = raw_rarity
+                # Normalize rarity text
+                normalized_rarity = OCRTextProcessor.normalize_text_for_comparison(raw_rarity)
+                
+                # Match against known rarities
+                known_rarities = ['ssr', 'sr', 'r', 'n', '★★★★★', '★★★★', '★★★', '★★', '★']
+                best_match = None
+                best_similarity = 0.0
+                
+                for known in known_rarities:
+                    normalized_known = OCRTextProcessor.normalize_text_for_comparison(known)
+                    if normalized_rarity == normalized_known:
+                        best_match = known.upper()
+                        best_similarity = 1.0
+                        break
+                    elif normalized_known in normalized_rarity or normalized_rarity in normalized_known:
+                        # Partial match
+                        similarity = min(len(normalized_known), len(normalized_rarity)) / max(len(normalized_known), len(normalized_rarity))
+                        if similarity > best_similarity:
+                            best_match = known.upper()
+                            best_similarity = similarity
+                
+                if best_match:
+                    result['rarity'] = best_match
+                    result['rarity_confidence'] = best_similarity
+                else:
+                    result['rarity'] = raw_rarity.upper()
+                    result['rarity_confidence'] = 0.5
+            
+            # Process character name (clean OCR artifacts)
+            raw_character = scan_results.get('character', '')
+            if raw_character:
+                result['raw_character'] = raw_character
+                # Clean common OCR artifacts
+                cleaned_character = raw_character.strip()
+                # Remove extra spaces
+                cleaned_character = ' '.join(cleaned_character.split())
+                result['character'] = cleaned_character
+                result['character_confidence'] = 0.8 if cleaned_character else 0.0
+            
+            logger.debug(f"Processed gacha result: {result['rarity']} - {result['character']} "
+                        f"(rarity conf: {result['rarity_confidence']:.2f}, char conf: {result['character_confidence']:.2f})")
+            
+        except Exception as e:
+            logger.error(f"Error processing gacha result: {e}")
+        
+        return result
+
+    def validate_gacha_result(self, processed_result: Dict[str, Any],
+                             expected_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Validate gacha result against expected data (if provided).
+        
+        Args:
+            processed_result: Processed gacha result from process_gacha_result()
+            expected_data: Optional expected data for validation
+            
+        Returns:
+            Dict with validation status and details
+        """
+        validation = {
+            'status': 'pass',
+            'rarity_match': True,
+            'character_match': True,
+            'message': 'No validation data provided'
+        }
+        
+        if not expected_data:
+            return validation
+        
+        try:
+            # Validate rarity
+            if 'expected_rarity' in expected_data:
+                expected_rarity = str(expected_data['expected_rarity']).upper()
+                actual_rarity = processed_result['rarity'].upper()
+                
+                rarity_match = OCRTextProcessor.compare_with_template(
+                    actual_rarity, expected_rarity, threshold=0.7
+                )
+                validation['rarity_match'] = rarity_match
+                
+                if not rarity_match:
+                    validation['status'] = 'fail'
+                    validation['message'] = f"Rarity mismatch: got {actual_rarity}, expected {expected_rarity}"
+            
+            # Validate character
+            if 'expected_character' in expected_data:
+                expected_char = str(expected_data['expected_character'])
+                actual_char = processed_result['character']
+                
+                char_match = OCRTextProcessor.compare_with_template(
+                    actual_char, expected_char, threshold=0.6
+                )
+                validation['character_match'] = char_match
+                
+                if not char_match:
+                    validation['status'] = 'fail'
+                    if validation['message'] == 'No validation data provided':
+                        validation['message'] = f"Character mismatch: got {actual_char}, expected {expected_char}"
+                    else:
+                        validation['message'] += f"; Character mismatch: got {actual_char}, expected {expected_char}"
+            
+            if validation['status'] == 'pass':
+                validation['message'] = 'All validations passed'
+                
+        except Exception as e:
+            validation['status'] = 'error'
+            validation['message'] = f"Validation error: {str(e)}"
+        
+        return validation
 
     def run_gacha_stage(self, pull_data: Dict[str, Any], pull_idx: int,
                       pull_type: str = "single") -> Dict[str, Any]:
@@ -100,18 +235,29 @@ class GachaAutomation(BaseAutomation):
             logger.info("Step 7: Scan result")
             scan_results = self.scan_screen_roi(screenshot_result)
 
-            # Extract rarity and character info
-            rarity = scan_results.get('rarity', '')
-            character = scan_results.get('character', '')
+            # Process results with OCR text processing
+            processed_result = self.process_gacha_result(scan_results)
+            
+            # Validate against expected data (if provided in pull_data)
+            validation_result = self.validate_gacha_result(processed_result, pull_data)
 
             result.update({
-                'rarity': rarity,
-                'character': character,
+                'rarity': processed_result['rarity'],
+                'character': processed_result['character'],
+                'rarity_confidence': processed_result['rarity_confidence'],
+                'character_confidence': processed_result['character_confidence'],
+                'raw_rarity': processed_result['raw_rarity'],
+                'raw_character': processed_result['raw_character'],
+                'validation': validation_result,
                 'scan_data': scan_results,
                 'success': True
             })
 
-            logger.info(f"Pull result: {rarity} - {character}")
+            logger.info(f"Pull result: {processed_result['rarity']} - {processed_result['character']} "
+                       f"(rarity conf: {processed_result['rarity_confidence']:.2f})")
+            
+            if validation_result['status'] != 'pass' and validation_result['message'] != 'No validation data provided':
+                logger.warning(f"Validation: {validation_result['message']}")
 
             # Step 8: Close result
             logger.info("Step 8: Close result")
@@ -176,6 +322,11 @@ class GachaAutomation(BaseAutomation):
                     rarity_counts = {}
 
                     for pull_idx in range(1, session_num_pulls + 1):
+                        try:
+                            self.check_cancelled(f"pull {pull_idx}")
+                        except CancellationError:
+                            logger.info(f"Cancellation requested, stopping at pull {pull_idx}")
+                            break
                         pull_result = self.run_gacha_stage({}, pull_idx, session_pull_type)
                         if pull_result['success']:
                             successful_pulls += 1
@@ -229,6 +380,11 @@ class GachaAutomation(BaseAutomation):
 
                 # Process each pull
                 for idx in range(1, num_pulls + 1):
+                    try:
+                        self.check_cancelled(f"pull {idx}")
+                    except CancellationError:
+                        logger.info(f"Cancellation requested, stopping at pull {idx}")
+                        break
                     pull_result = self.run_gacha_stage({}, idx, pull_type)
                     all_results.append(pull_result)
 
@@ -294,6 +450,11 @@ class GachaAutomation(BaseAutomation):
             gacha.run(data_path='./data/gacha_tests.csv')
         """
         logger.info("="*60 + "\nGACHA AUTOMATION START\n" + "="*60)
+
+        try:
+            self.check_cancelled("before starting")
+        except CancellationError:
+            return False
 
         if not self.agent.is_device_connected():
             logger.error("✗ Device not connected")

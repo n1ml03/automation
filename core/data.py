@@ -68,7 +68,12 @@ def load_data(file_path: str, encoding: str = 'utf-8') -> List[Dict[str, Any]]:
 
 def write_csv(file_path: str, data: List[Dict[str, Any]],
               encoding: str = 'utf-8', mode: str = 'w') -> bool:
-    """Write list of dictionaries to CSV file."""
+    """
+    Write list of dictionaries to CSV file.
+    
+    Note: For incremental writes, always use mode='w' to rewrite entire file
+    with all accumulated results. This ensures data consistency.
+    """
     if not data:
         logger.warning(" No data to write")
         return False
@@ -77,13 +82,14 @@ def write_csv(file_path: str, data: List[Dict[str, Any]],
         if directory := os.path.dirname(file_path):
             ensure_directory(directory)
 
-        with open(file_path, mode, newline='', encoding=encoding) as f:
+        # Always write in 'w' mode to ensure complete file rewrite
+        # This is safe because ResultWriter maintains all results in memory
+        with open(file_path, 'w', newline='', encoding=encoding) as f:
             writer = csv.DictWriter(f, fieldnames=data[0].keys())
-            if mode == 'w' or (mode == 'a' and not os.path.exists(file_path)):
-                writer.writeheader()
+            writer.writeheader()
             writer.writerows(data)
 
-        logger.info(f" Wrote {len(data)} rows to CSV: {file_path}")
+        logger.debug(f" Wrote {len(data)} rows to CSV: {file_path}")
         return True
     except Exception as e:
         logger.error(f" Error writing CSV: {e}")
@@ -93,19 +99,54 @@ def write_csv(file_path: str, data: List[Dict[str, Any]],
 # ==================== RESULT WRITER CLASS ====================
 
 class ResultWriter:
-    """Utility class for writing test/automation results to CSV with buffering."""
+    """Utility class for writing test/automation results to CSV with buffering and resume support."""
 
     RESULT_OK, RESULT_NG, RESULT_SKIP, RESULT_ERROR = 'OK', 'NG', 'SKIP', 'ERROR'
 
-    def __init__(self, output_path: str, auto_write: bool = False):
-        """Initialize ResultWriter with output path and auto-write option."""
+    def __init__(self, output_path: str, auto_write: bool = True, resume: bool = True, batch_size: int = 100):
+        """
+        Initialize ResultWriter with output path and auto-write option.
+        
+        Args:
+            output_path: Path to output CSV file
+            auto_write: Automatically write after each add_result (default: True for incremental saving)
+            resume: Load existing results if file exists (default: True for resume support)
+            batch_size: Number of results to accumulate before writing (default: 100 for memory efficiency)
+        """
         self.output_path = output_path
         self.auto_write = auto_write
+        self.batch_size = batch_size
         self.results: List[Dict[str, Any]] = []
+        self.completed_test_ids: set = set()
+        self._pending_writes = 0
 
         if directory := os.path.dirname(output_path):
             ensure_directory(directory)
-        logger.info(f"ResultWriter initialized: {output_path}")
+        
+        # Load existing results for resume support
+        if resume and os.path.exists(output_path):
+            self._load_existing_results()
+        
+        logger.info(f"ResultWriter initialized: {output_path} ({len(self.results)} existing results, batch_size={batch_size})")
+
+    def _load_existing_results(self) -> None:
+        """Load existing results from CSV file for resume support."""
+        try:
+            existing_data = load_csv(self.output_path)
+            self.results = existing_data
+            # Track completed test IDs
+            for row in existing_data:
+                test_id = row.get('test_case_id')
+                if test_id:
+                    self.completed_test_ids.add(str(test_id))
+            logger.info(f"Loaded {len(self.results)} existing results, {len(self.completed_test_ids)} completed test cases")
+        except Exception as e:
+            logger.warning(f"Could not load existing results: {e}")
+
+    def is_completed(self, test_case: Dict[str, Any]) -> bool:
+        """Check if a test case has already been completed."""
+        test_id = test_case.get('test_case_id')
+        return str(test_id) in self.completed_test_ids if test_id else False
 
     def add_result(self, test_case: Dict[str, Any], result: str,
                   error_message: Optional[str] = None,
@@ -118,9 +159,23 @@ class ResultWriter:
         if extra_fields:
             row_data.update(extra_fields)
         
+        # Track completed test ID
+        test_id = test_case.get('test_case_id')
+        if test_id:
+            self.completed_test_ids.add(str(test_id))
+        
         self.results.append(row_data)
+        
+        # Batch writes for memory efficiency
         if self.auto_write:
-            self.write()
+            self._pending_writes += 1
+            # Write when batch size reached, or immediately for first result
+            if self._pending_writes >= self.batch_size:
+                self.write()
+                self._pending_writes = 0
+            elif self._pending_writes == 1:
+                # Write first result immediately for responsiveness
+                self.write()
 
     def write(self, clear_after_write: bool = False) -> bool:
         """Write all results to CSV file, optionally clear buffer after."""
@@ -131,7 +186,13 @@ class ResultWriter:
         success = write_csv(self.output_path, self.results)
         if success and clear_after_write:
             self.clear()
+        elif success:
+            logger.debug(f"Incremental save: {len(self.results)} results written to {self.output_path}")
         return success
+    
+    def flush(self) -> bool:
+        """Force write all results immediately (alias for write())."""
+        return self.write()
 
     def clear(self) -> None:
         """Clear results buffer."""
