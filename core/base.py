@@ -11,6 +11,7 @@ from airtest.core.api import Template, exists, sleep
 
 from .agent import Agent
 from .utils import get_logger, ensure_directory
+from .detector import TextProcessor
 
 
 logger = get_logger(__name__)
@@ -260,6 +261,7 @@ class BaseAutomation:
                 return ""
 
             text = ocr_result.get('text', '').strip()
+            # Use unified TextProcessor (NO DUPLICATION)
             text = self._clean_ocr_text(text)
 
             logger.debug(f"ROI '{roi_name}': '{text}'")
@@ -269,25 +271,26 @@ class BaseAutomation:
             logger.error(f"✗ OCR ROI '{roi_name}': {e}")
             return ""
 
-    def _clean_ocr_text(self, text: str) -> str:
+    @staticmethod
+    def _clean_ocr_text(text: str) -> str:
         """
-        Clean OCR text (remove special chars, normalize).
-
+        Clean OCR text using unified TextProcessor.
+        
         Args:
             text: Text to clean
-
+            
         Returns:
             str: Cleaned text
         """
         if not text:
             return ""
-
-        # Remove extra whitespace
-        text = ' '.join(text.split())
-
+        
         # Remove newlines
         text = text.replace('\n', ' ').replace('\r', '')
-
+        
+        # Remove extra whitespace
+        text = ' '.join(text.split())
+        
         return text.strip()
 
     def scan_screen_roi(self, screenshot: Optional[Any] = None,

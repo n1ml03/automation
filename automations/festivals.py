@@ -399,31 +399,32 @@ class FestivalAutomation(BaseAutomation):
                 has_quantity = False
                 quantity = 0
 
-            # Use OCRTextProcessor for field-specific validation and extraction
+            # Use OCRTextProcessor for field-specific validation and extraction (returns dataclass)
             validation_result = OCRTextProcessor.validate_field(field, extracted_text, expected_value)
-            text_match = validation_result['status'] == 'match'
+            text_match = validation_result.status == 'match'
             
             # Store detailed results if requested
             if return_details:
                 detailed_results[field] = {
-                    'status': validation_result['status'],
+                    'status': validation_result.status,
                     'extracted_text': extracted_text,
-                    'extracted_value': validation_result['extracted'],
-                    'expected': validation_result['expected'],
+                    'extracted_value': validation_result.extracted,
+                    'expected': validation_result.expected,
                     'detected': detected,
                     'detection_count': detection_count,
                     'has_quantity': has_quantity,
                     'quantity': quantity,
-                    'message': validation_result['message']
+                    'message': validation_result.message,
+                    'confidence': validation_result.confidence
                 }
             
             if text_match:
                 matches += 1
-                logger.debug(f"✓ {field}: {validation_result['message']}")
+                logger.debug(f"✓ {field}: {validation_result.message}")
             else:
-                mismatch_msg = f"{field}:{validation_result['extracted']}≠{validation_result['expected']}"
+                mismatch_msg = f"{field}:{validation_result.extracted}≠{validation_result.expected}"
                 mismatches.append(mismatch_msg)
-                logger.debug(f"✗ {field}: {validation_result['message']}")
+                logger.debug(f"✗ {field}: {validation_result.message}")
 
         total = len(comparable_fields)
         is_ok = matches == total
